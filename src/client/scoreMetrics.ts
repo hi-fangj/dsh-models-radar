@@ -3,6 +3,14 @@
 export type IqBand = 'low' | 'general' | 'steady' | 'excellent' | 'leading'
 export type TrendDirection = 'up' | 'down' | 'flat'
 
+/**
+ * The steady band's color: the true brand blue. The neutral
+ * `--dsw-alias-brand-primary` alias maps to the bluish grey scale
+ * (near-black in light, near-white in dark), which reads grey — band
+ * semantics must use the real brand blue instead.
+ */
+export const STEADY_COLOR = 'var(--dsw-alias-brand-primary-new-colorprimary-new-color)'
+
 /** Fixed cross-channel IQ bands recorded in CONTEXT.md. */
 export function iqBand(iq: number): IqBand {
   if (iq >= 100) return 'leading'

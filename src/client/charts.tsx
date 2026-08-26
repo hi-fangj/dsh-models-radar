@@ -4,7 +4,7 @@ import type { MouseEvent } from 'react'
 import type { ModelRadarKey } from './locales.ts'
 import { fmt } from './locales.ts'
 import { PersistentScrollFrame } from './ScrollFrame.tsx'
-import { iqBand, trendSummary } from './scoreMetrics.ts'
+import { iqBand, STEADY_COLOR, trendSummary } from './scoreMetrics.ts'
 import type { IqBand } from './scoreMetrics.ts'
 
 const TREND_W = 640
@@ -34,7 +34,7 @@ function bandColor(band: IqBand): string {
   switch (band) {
     case 'low': return 'var(--dsw-alias-state-error-primary)'
     case 'general': return 'var(--dsw-alias-state-warn-primary)'
-    case 'steady': return 'var(--dsw-alias-brand-primary)'
+    case 'steady': return STEADY_COLOR
     case 'excellent':
     case 'leading': return 'var(--dsw-alias-state-success-primary)'
   }
@@ -53,29 +53,12 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
-/** Catmull-Rom points converted to a clamped cubic Bézier SVG path. */
-function smoothPath(points: Array<[number, number]>, minY: number, maxY: number): string {
-  if (points.length === 0) return ''
-  if (points.length === 1) return `M ${points[0][0]} ${points[0][1]}`
-  let path = `M ${points[0][0].toFixed(1)} ${points[0][1].toFixed(1)}`
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[Math.max(0, i - 1)]
-    const p1 = points[i]
-    const p2 = points[i + 1]
-    const p3 = points[Math.min(points.length - 1, i + 2)]
-    const c1x = p1[0] + (p2[0] - p0[0]) / 6
-    const c1y = clamp(p1[1] + (p2[1] - p0[1]) / 6, minY, maxY)
-    const c2x = p2[0] - (p3[0] - p1[0]) / 6
-    const c2y = clamp(p2[1] - (p3[1] - p1[1]) / 6, minY, maxY)
-    path += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`
-  }
-  return path
-}
-
-/** One painted polyline piece: a band color plus an SVG path. */
+/** One painted polyline piece: a band color plus an SVG path and its x extent. */
 interface PaintedPiece {
   color: string
   path: string
+  x0: number
+  x1: number
 }
 
 /**
@@ -85,13 +68,14 @@ interface PaintedPiece {
  * the boundary point itself belonging to the upper band.
  */
 function buildSegments(values: number[], x: (index: number) => number, y: (value: number) => number): PaintedPiece[] {
-  const pieces: Array<{ color: string; d: string[] }> = []
+  const pieces: Array<{ color: string; d: string[]; x0: number; x1: number }> = []
   const add = (color: string, point: [number, number]): void => {
     const last = pieces[pieces.length - 1]
     if (last !== undefined && last.color === color) {
       last.d.push(`L ${point[0].toFixed(1)} ${point[1].toFixed(1)}`)
+      last.x1 = point[0]
     } else {
-      pieces.push({ color, d: [`M ${point[0].toFixed(1)} ${point[1].toFixed(1)}`] })
+      pieces.push({ color, d: [`M ${point[0].toFixed(1)} ${point[1].toFixed(1)}`], x0: point[0], x1: point[0] })
     }
   }
   for (let i = 0; i < values.length - 1; i++) {
@@ -114,7 +98,7 @@ function buildSegments(values: number[], x: (index: number) => number, y: (value
     add(bandColor(band), from)
     add(bandColor(band), [x(i + 1), y(v1)])
   }
-  return pieces.map(({ color, d }) => ({ color, path: d.join(' ') }))
+  return pieces.map(({ color, d, x0, x1 }) => ({ color, path: d.join(' '), x0, x1 }))
 }
 
 export function TrendLine({ points, t }: { points: Array<[string, number]>; t: Translate }) {
@@ -140,18 +124,13 @@ export function TrendLine({ points, t }: { points: Array<[string, number]>; t: T
     const innerH = TREND_H - PAD.top - PAD.bottom
     const x = (index: number): number => PAD.left + (index / (points.length - 1)) * innerW
     const y = (value: number): number => PAD.top + (1 - (value - lo) / (hi - lo)) * innerH
-    const coordinates = points.map(([, value], index): [number, number] => [x(index), y(value)])
-    const line = smoothPath(coordinates, PAD.top, TREND_H - PAD.bottom)
-    const baseline = TREND_H - PAD.bottom
-    const area = `${line} L ${coordinates[coordinates.length - 1][0].toFixed(1)} ${baseline} L ${coordinates[0][0].toFixed(1)} ${baseline} Z`
     return {
       lo,
       hi,
       x,
       y,
-      line,
-      area,
       last: points.length - 1,
+      baseline: TREND_H - PAD.bottom,
       segments: buildSegments(points.map(([, value]) => value), x, y),
       bandLines: BAND_BOUNDARIES.map((boundary) => ({ boundary, py: y(boundary) }))
         .filter(({ py }) => py >= PAD.top - 0.5 && py <= TREND_H - PAD.bottom + 0.5),
@@ -160,7 +139,7 @@ export function TrendLine({ points, t }: { points: Array<[string, number]>; t: T
 
   if (geometry === null || summary === null) return <div className="dsh_mr_empty" />
 
-  const { lo, hi, x, y, area, last, segments, bandLines } = geometry
+  const { lo, hi, x, y, last, baseline, segments, bandLines } = geometry
   const mid = (lo + hi) / 2
   const hovered = hoverIndex !== null ? points[hoverIndex] : undefined
   const deltaText =
@@ -207,9 +186,15 @@ export function TrendLine({ points, t }: { points: Array<[string, number]>; t: T
               <text x={TREND_W - PAD.right + 6} y={py + 3.5} textAnchor="start" style={{ ...AXIS_STYLE, fontSize: 9 }}>{boundary}</text>
             </g>
           ))}
-          <path d={area} fill="var(--dsw-alias-brand-primary)" fillOpacity="0.09" />
           {segments.map((segment, index) => (
-            <path key={index} d={segment.path} fill="none" stroke={segment.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            <g key={index}>
+              <path
+                d={`${segment.path} L ${segment.x1.toFixed(1)} ${baseline} L ${segment.x0.toFixed(1)} ${baseline} Z`}
+                fill={segment.color}
+                fillOpacity="0.09"
+              />
+              <path d={segment.path} fill="none" stroke={segment.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+            </g>
           ))}
           {hovered !== undefined && hoverIndex !== null && (
             <>

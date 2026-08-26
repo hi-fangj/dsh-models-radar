@@ -6,6 +6,9 @@
  * `dsh_mr` prefix to stay unique in the assembled shell.
  */
 
+/** The steady/good band semantic color; see scoreMetrics.STEADY_COLOR. */
+import { STEADY_COLOR } from './scoreMetrics.ts'
+
 /** Stable `<style>` element id (idempotent injection across HMR re-runs). */
 export const STYLE_ID = 'dsh-models-radar-style'
 
@@ -78,7 +81,7 @@ export const cssText = `
 .dsh_mr_badgeVal[data-accent="true"] { color: var(--dsw-alias-brand-primary); }
 .dsh_mr_badgeVal[data-band="low"] { color: var(--dsw-alias-state-error-primary); }
 .dsh_mr_badgeVal[data-band="general"] { color: var(--dsw-alias-state-warn-primary); }
-.dsh_mr_badgeVal[data-band="steady"] { color: var(--dsw-alias-brand-primary); }
+.dsh_mr_badgeVal[data-band="steady"] { color: ${STEADY_COLOR}; }
 .dsh_mr_badgeVal[data-band="excellent"],
 .dsh_mr_badgeVal[data-band="leading"] { color: var(--dsw-alias-state-success-primary); }
 .dsh_mr_badgeLabel { font-size: 11.5px; color: var(--dsw-alias-label-secondary); }
@@ -318,13 +321,13 @@ span.dsh_mr_ovChevron { cursor: default; }
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: 5px;
-  background: var(--dsw-alias-brand-primary);
+  background: ${STEADY_COLOR};
   opacity: 0.28;
   transition: width 240ms ease;
 }
 .dsh_mr_ovBarFill[data-band="low"] { background: var(--dsw-alias-state-error-primary); }
 .dsh_mr_ovBarFill[data-band="general"] { background: var(--dsw-alias-state-warn-primary); }
-.dsh_mr_ovBarFill[data-band="steady"] { background: var(--dsw-alias-brand-primary); }
+.dsh_mr_ovBarFill[data-band="steady"] { background: ${STEADY_COLOR}; }
 .dsh_mr_ovBarFill[data-band="excellent"],
 .dsh_mr_ovBarFill[data-band="leading"] { background: var(--dsw-alias-state-success-primary); }
 .dsh_mr_ovBarFill[data-band="leading"] { opacity: 0.42; }
@@ -379,7 +382,7 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_taskAggregate [data-band="general"] { background: var(--dsw-alias-state-warn-primary); }
 .dsh_mr_taskAggregate [data-band="fail"],
 .dsh_mr_taskAggregate [data-band="low"] { background: var(--dsw-alias-state-error-primary); }
-.dsh_mr_taskAggregate [data-band="good"] { background: var(--dsw-alias-brand-primary); }
+.dsh_mr_taskAggregate [data-band="good"] { background: ${STEADY_COLOR}; }
 .dsh_mr_taskFilters {
   display: flex;
   align-items: center;
@@ -412,7 +415,7 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_taskFilters button[data-active="true"][data-band="general"] { color: var(--dsw-alias-state-warn-primary); }
 .dsh_mr_taskFilters button[data-active="true"][data-band="fail"],
 .dsh_mr_taskFilters button[data-active="true"][data-band="low"] { color: var(--dsw-alias-state-error-primary); }
-.dsh_mr_taskFilters button[data-active="true"][data-band="good"] { color: var(--dsw-alias-brand-primary); }
+.dsh_mr_taskFilters button[data-active="true"][data-band="good"] { color: ${STEADY_COLOR}; }
 .dsh_mr_barRow {
   display: grid;
   grid-template-columns: minmax(140px, 220px) 1fr 44px;
@@ -447,7 +450,7 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_barFill[data-band="general"] { background: var(--dsw-alias-state-warn-primary); }
 .dsh_mr_barFill[data-band="fail"],
 .dsh_mr_barFill[data-band="low"] { background: var(--dsw-alias-state-error-primary); }
-.dsh_mr_barFill[data-band="good"] { background: var(--dsw-alias-brand-primary); }
+.dsh_mr_barFill[data-band="good"] { background: ${STEADY_COLOR}; }
 .dsh_mr_barVal {
   font-size: 11.5px;
   color: var(--dsw-alias-label-primary);
@@ -460,7 +463,7 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_barVal[data-band="general"] { color: var(--dsw-alias-state-warn-primary); }
 .dsh_mr_barVal[data-band="fail"],
 .dsh_mr_barVal[data-band="low"] { color: var(--dsw-alias-state-error-primary); }
-.dsh_mr_barVal[data-band="good"] { color: var(--dsw-alias-brand-primary); }
+.dsh_mr_barVal[data-band="good"] { color: ${STEADY_COLOR}; }
 .dsh_mr_more {
   appearance: none;
   align-self: flex-start;
@@ -573,7 +576,7 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
 .dsh_mr_liveIq { font-size: 12.5px; line-height: 18px; }
 .dsh_mr_liveReadout[data-band="low"] .dsh_mr_liveIq { color: var(--dsw-alias-state-error-primary); }
 .dsh_mr_liveReadout[data-band="general"] .dsh_mr_liveIq { color: var(--dsw-alias-state-warn-primary); }
-.dsh_mr_liveReadout[data-band="steady"] .dsh_mr_liveIq { color: var(--dsw-alias-brand-primary); }
+.dsh_mr_liveReadout[data-band="steady"] .dsh_mr_liveIq { color: ${STEADY_COLOR}; }
 .dsh_mr_liveReadout[data-band="excellent"] .dsh_mr_liveIq,
 .dsh_mr_liveReadout[data-band="leading"] .dsh_mr_liveIq { color: var(--dsw-alias-state-success-primary); }
 .dsh_mr_liveDelta { font-size: 10.5px; }
