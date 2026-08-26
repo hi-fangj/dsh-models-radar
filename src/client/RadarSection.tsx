@@ -19,6 +19,7 @@ import { fmt } from './locales.ts'
 import { TierOverview } from './Overview.tsx'
 import { TaskBars, TrendLine } from './charts.tsx'
 import { iqBand } from './scoreMetrics.ts'
+import { moneyText, minutesText, pctText } from './format.ts'
 
 /** Injected business face: the same-origin data loader. */
 export interface RadarInjected {
@@ -63,10 +64,6 @@ export function autoMatchTier(view: RadarView): string | null {
   )
   return fuzzy?.key ?? null
 }
-
-const pctText = (rate: number): string => `${Math.round(rate * 100)}%`
-const moneyText = (value: number | null): string => (value === null ? '—' : `$${value.toFixed(2)}`)
-const minutesText = (value: number | null): string => (value === null ? '—' : `${value.toFixed(1)} min`)
 
 /**
  * Render the radar section.

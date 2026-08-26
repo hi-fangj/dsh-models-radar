@@ -285,6 +285,17 @@ span.dsh_mr_ovChevron { cursor: default; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dsh_mr_ovCurrent {
+  flex: none;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--dsw-alias-brand-primary);
+  border-radius: 5px;
+  color: var(--dsw-alias-brand-primary);
+  font-size: 9.5px;
+  line-height: 14px;
+  font-weight: 600;
+}
 .dsh_mr_ovEffort { color: var(--dsw-alias-label-secondary); }
 .dsh_mr_ovChild .dsh_mr_ovName { color: var(--dsw-alias-label-secondary); }
 .dsh_mr_ovDelta {
@@ -505,6 +516,7 @@ span.dsh_mr_ovChevron { cursor: default; }
 }
 .dsh_mr_liveReadout {
   box-sizing: border-box;
+  appearance: none;
   display: inline-flex;
   align-items: center;
   align-self: center;
@@ -516,9 +528,15 @@ span.dsh_mr_ovChevron { cursor: default; }
   border-radius: 14px;
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
-  white-space: nowrap;
+  font: inherit;
   font-variant-numeric: tabular-nums;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
 }
+.dsh_mr_liveReadout:hover { background: var(--dsw-alias-bg-layer-2); }
+.dsh_mr_liveReadout:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
+.dsh_mr_liveReadout[data-open="true"] { border-color: var(--dsw-alias-brand-primary); }
 /* The dock slot renders entries as a Fragment under InputBar's vertical root.
    When the known billing entry precedes this readout, promote only that exact
    parent to a centered grid: composer chrome spans all columns; the two pills
@@ -558,6 +576,57 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
 .dsh_mr_liveDelta[data-dir="down"] { color: var(--dsw-alias-state-error-primary); }
 .dsh_mr_liveDelta[data-dir="flat"] { color: var(--dsw-alias-brand-primary); }
 .dsh_mr_liveSpark { display: block; flex: none; width: 72px; height: 18px; }
+/* The capability popover: a non-modal anchored panel above the readout,
+   portaled to body, rendered at the shell's menu elevation. */
+.dsh_mr_popover {
+  position: fixed;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(72vh, 640px);
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-overlay);
+  box-shadow: var(--dsw-shadow-lv3);
+  color: var(--dsw-alias-label-primary);
+  font-size: 12.5px;
+}
+.dsh_mr_popoverHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.dsh_mr_popoverTier {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dsh_mr_popoverChannel {
+  flex: none;
+  font-size: 11px;
+  color: var(--dsw-alias-label-secondary);
+}
+.dsh_mr_popoverBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.dsh_mr_popoverBody::-webkit-scrollbar { display: none; }
+.dsh_mr_popoverFooter {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
 .dsh_mr_footer {
   display: flex;
   align-items: center;

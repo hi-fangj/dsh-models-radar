@@ -15,8 +15,12 @@ interface OverviewProps {
   view: RadarView
   /** Currently selected tier key (highlighted row), null when unmatched yet. */
   selectedKey: string | null
+  /** The session's matched tier key, marked as the in-use model; null to hide the mark. */
+  currentKey?: string | null
   onSelect: (tierKey: string) => void
   t: (key: ModelRadarKey) => string
+  /** Wrap the list in the persistent scroll frame; false lets the parent viewport own scrolling. */
+  scroll?: boolean
 }
 
 /** One base model's ladder plus its strongest tier (tiers arrive IQ-sorted). */
@@ -51,7 +55,7 @@ function DeltaBadge({ points }: { points: Array<[string, number]> | undefined })
   )
 }
 
-export function TierOverview({ view, selectedKey, onSelect, t }: OverviewProps) {
+export function TierOverview({ view, selectedKey, currentKey, onSelect, t, scroll = true }: OverviewProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const groups = groupByBase(view)
   if (groups.length === 0) return null
@@ -65,95 +69,105 @@ export function TierOverview({ view, selectedKey, onSelect, t }: OverviewProps) 
     })
   }
 
+  const list = (
+    <div className="dsh_mr_bars">
+      {groups.map((group, index) => {
+        const isOpen = expanded.has(group.base)
+        const isSelected = group.best.key === selectedKey
+        const hasSelectedChild =
+          selectedKey !== null && group.tiers.some((tier) => tier.key === selectedKey && tier.key !== group.best.key)
+        const isCurrent = currentKey !== null && currentKey !== undefined && group.tiers.some((tier) => tier.key === currentKey)
+        const widthPct = iqProgress(group.best.iq) * 100
+        const band = iqBand(group.best.iq)
+        return (
+          <div className="dsh_mr_ovGroup" key={group.base}>
+            <div
+              className="dsh_mr_ovRow"
+              data-selected={isSelected}
+              data-group-selected={hasSelectedChild}
+              role="button"
+              aria-current={isSelected ? 'true' : undefined}
+              tabIndex={0}
+              onClick={() => onSelect(group.best.key)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') onSelect(group.best.key)
+              }}
+            >
+              <span className="dsh_mr_ovRank">{index + 1}</span>
+              <button
+                type="button"
+                className="dsh_mr_ovChevron"
+                aria-label={isOpen ? 'collapse' : 'expand'}
+                data-open={isOpen}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  toggle(group.base)
+                }}
+              >
+                ▸
+              </button>
+              <span className="dsh_mr_ovName" title={group.base}>
+                {group.base}
+                <span className="dsh_mr_ovEffort"> · {group.best.effort}</span>
+                {isCurrent && <span className="dsh_mr_ovCurrent">{t('overview.current')}</span>}
+              </span>
+              <DeltaBadge points={view.series[group.best.key]} />
+              <span className="dsh_mr_ovIqCell">
+                <span className="dsh_mr_ovBarFill" data-band={band} style={{ width: `${widthPct}%` }} />
+                {band === 'leading' && <span className="dsh_mr_ovLevel">{t('level.leading')}</span>}
+                <span className="dsh_mr_ovIqVal">{group.best.iq.toFixed(1)}</span>
+              </span>
+            </div>
+            {isOpen &&
+              group.tiers
+                .filter((tier) => tier.key !== group.best.key)
+                .map((tier) => (
+                  <div
+                    key={tier.key}
+                    className="dsh_mr_ovRow dsh_mr_ovChild"
+                    data-selected={tier.key === selectedKey}
+                    role="button"
+                    aria-current={tier.key === selectedKey ? 'true' : undefined}
+                    tabIndex={0}
+                    onClick={() => onSelect(tier.key)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') onSelect(tier.key)
+                    }}
+                  >
+                    <span className="dsh_mr_ovRank" />
+                    <span className="dsh_mr_ovChevron" />
+                    <span className="dsh_mr_ovName">{tier.effort}</span>
+                    <DeltaBadge points={view.series[tier.key]} />
+                    <span className="dsh_mr_ovIqCell">
+                      <span
+                        className="dsh_mr_ovBarFill"
+                        data-band={iqBand(tier.iq)}
+                        style={{ width: `${iqProgress(tier.iq) * 100}%` }}
+                      />
+                      {iqBand(tier.iq) === 'leading' && <span className="dsh_mr_ovLevel">{t('level.leading')}</span>}
+                      <span className="dsh_mr_ovIqVal">{tier.iq.toFixed(1)}</span>
+                    </span>
+                  </div>
+                ))}
+          </div>
+        )
+      })}
+    </div>
+  )
+
   return (
     <div className="dsh_mr_card">
       <div className="dsh_mr_cardHead">
         <span className="dsh_mr_cardTitle">{t('overview.title')}</span>
         <span className="dsh_mr_hint">{t('overview.hint')}</span>
       </div>
-      <PersistentScrollFrame viewportClassName="dsh_mr_ovScroll" label={t('overview.title')}>
-        <div className="dsh_mr_bars">
-        {groups.map((group, index) => {
-          const isOpen = expanded.has(group.base)
-          const isSelected = group.best.key === selectedKey
-          const hasSelectedChild =
-            selectedKey !== null && group.tiers.some((tier) => tier.key === selectedKey && tier.key !== group.best.key)
-          const widthPct = iqProgress(group.best.iq) * 100
-          const band = iqBand(group.best.iq)
-          return (
-            <div className="dsh_mr_ovGroup" key={group.base}>
-              <div
-                className="dsh_mr_ovRow"
-                data-selected={isSelected}
-                data-group-selected={hasSelectedChild}
-                role="button"
-                aria-current={isSelected ? 'true' : undefined}
-                tabIndex={0}
-                onClick={() => onSelect(group.best.key)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') onSelect(group.best.key)
-                }}
-              >
-                <span className="dsh_mr_ovRank">{index + 1}</span>
-                <button
-                  type="button"
-                  className="dsh_mr_ovChevron"
-                  aria-label={isOpen ? 'collapse' : 'expand'}
-                  data-open={isOpen}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    toggle(group.base)
-                  }}
-                >
-                  ▸
-                </button>
-                <span className="dsh_mr_ovName" title={group.base}>
-                  {group.base}
-                  <span className="dsh_mr_ovEffort"> · {group.best.effort}</span>
-                </span>
-                <DeltaBadge points={view.series[group.best.key]} />
-                <span className="dsh_mr_ovIqCell">
-                  <span className="dsh_mr_ovBarFill" data-band={band} style={{ width: `${widthPct}%` }} />
-                  {band === 'leading' && <span className="dsh_mr_ovLevel">{t('level.leading')}</span>}
-                  <span className="dsh_mr_ovIqVal">{group.best.iq.toFixed(1)}</span>
-                </span>
-              </div>
-              {isOpen &&
-                group.tiers
-                  .filter((tier) => tier.key !== group.best.key)
-                  .map((tier) => (
-                    <div
-                      key={tier.key}
-                      className="dsh_mr_ovRow dsh_mr_ovChild"
-                      data-selected={tier.key === selectedKey}
-                      role="button"
-                      aria-current={tier.key === selectedKey ? 'true' : undefined}
-                      tabIndex={0}
-                      onClick={() => onSelect(tier.key)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') onSelect(tier.key)
-                      }}
-                    >
-                      <span className="dsh_mr_ovRank" />
-                      <span className="dsh_mr_ovChevron" />
-                      <span className="dsh_mr_ovName">{tier.effort}</span>
-                      <DeltaBadge points={view.series[tier.key]} />
-                      <span className="dsh_mr_ovIqCell">
-                        <span
-                          className="dsh_mr_ovBarFill"
-                          data-band={iqBand(tier.iq)}
-                          style={{ width: `${iqProgress(tier.iq) * 100}%` }}
-                        />
-                        {iqBand(tier.iq) === 'leading' && <span className="dsh_mr_ovLevel">{t('level.leading')}</span>}
-                        <span className="dsh_mr_ovIqVal">{tier.iq.toFixed(1)}</span>
-                      </span>
-                    </div>
-                  ))}
-            </div>
-          )
-        })}
-        </div>
-      </PersistentScrollFrame>
+      {scroll ? (
+        <PersistentScrollFrame viewportClassName="dsh_mr_ovScroll" label={t('overview.title')}>
+          {list}
+        </PersistentScrollFrame>
+      ) : (
+        list
+      )}
     </div>
   )
 }

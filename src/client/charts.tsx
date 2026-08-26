@@ -174,11 +174,14 @@ export function TaskBars({
   benchmark,
   scoringMode,
   t,
+  scroll = true,
 }: {
   rows: TaskRow[]
   benchmark: string
   scoringMode?: string
   t: Translate
+  /** Wrap the list in the persistent scroll frame; false lets the parent viewport own scrolling. */
+  scroll?: boolean
 }) {
   const mode = taskMode(benchmark, scoringMode)
   const categories: TaskCategory[] = mode === 'binary' ? ['pass', 'split', 'fail'] : ['excellent', 'good', 'general', 'low']
@@ -196,6 +199,20 @@ export function TaskBars({
     mode === 'binary'
       ? fmt(t('task.summary.pass'), { passed: String(passed), total: String(rows.length), rate: `${Math.round((passed / Math.max(1, rows.length)) * 100)}%` })
       : fmt(t('task.summary.average'), { rate: `${Math.round(average * 100)}%` })
+
+  const bars = (
+    <div className="dsh_mr_bars">
+      {visible.map(({ row: [taskId, rate], category }) => (
+        <div className="dsh_mr_barRow" key={taskId}>
+          <span className="dsh_mr_barLabel" title={taskId}>{taskId}</span>
+          <div className="dsh_mr_barTrack">
+            <div className="dsh_mr_barFill" data-band={category} style={{ width: `${clamp(rate, 0, 1) * 100}%` }} />
+          </div>
+          <span className="dsh_mr_barVal" data-band={category}>{Math.round(rate * 100)}%</span>
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <>
@@ -217,19 +234,13 @@ export function TaskBars({
           )
         })}
       </div>
-      <PersistentScrollFrame viewportClassName="dsh_mr_taskScroll" label={t('bar.title')}>
-        <div className="dsh_mr_bars">
-          {visible.map(({ row: [taskId, rate], category }) => (
-            <div className="dsh_mr_barRow" key={taskId}>
-              <span className="dsh_mr_barLabel" title={taskId}>{taskId}</span>
-              <div className="dsh_mr_barTrack">
-                <div className="dsh_mr_barFill" data-band={category} style={{ width: `${clamp(rate, 0, 1) * 100}%` }} />
-              </div>
-              <span className="dsh_mr_barVal" data-band={category}>{Math.round(rate * 100)}%</span>
-            </div>
-          ))}
-        </div>
-      </PersistentScrollFrame>
+      {scroll ? (
+        <PersistentScrollFrame viewportClassName="dsh_mr_taskScroll" label={t('bar.title')}>
+          {bars}
+        </PersistentScrollFrame>
+      ) : (
+        bars
+      )}
     </>
   )
 }
