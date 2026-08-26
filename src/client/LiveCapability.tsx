@@ -20,9 +20,9 @@ import type { PropsLocale, PropsRuntime, InjectFace } from '@deepseek-ai/dsh-cli
 import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RadarPayload, RadarTier, RadarView } from '../contract.ts'
-import { iqBand, trendSummary } from './scoreMetrics.ts'
+import { bandColor, iqBand, trendSummary } from './scoreMetrics.ts'
 import { moneyText, minutesText, pctText } from './format.ts'
-import { TaskBars, TrendLine } from './charts.tsx'
+import { TaskBars, TrendLine, buildSegments } from './charts.tsx'
 import { TierOverview } from './Overview.tsx'
 import { fmt } from './locales.ts'
 
@@ -78,7 +78,7 @@ function matchTier(view: RadarView, selection: ModelSelection): TierMatch | null
   return fuzzy === undefined ? null : { tier: fuzzy, approximate: true }
 }
 
-function MiniTrend({ points, direction }: { points: Array<[string, number]>; direction: 'up' | 'down' | 'flat' }) {
+function MiniTrend({ points }: { points: Array<[string, number]> }) {
   const recent = points.slice(-49)
   if (recent.length < 2) return null
   const width = 72
@@ -91,22 +91,25 @@ function MiniTrend({ points, direction }: { points: Array<[string, number]>; dir
     min -= 0.5
     max += 0.5
   }
-  const coords = recent.map(([, value], index) => {
-    const x = pad + (index / (recent.length - 1)) * (width - pad * 2)
-    const y = pad + (1 - (value - min) / (max - min)) * (height - pad * 2)
-    return `${x.toFixed(1)},${y.toFixed(1)}`
-  })
-  const color =
-    direction === 'up'
-      ? 'var(--dsw-alias-state-success-primary)'
-      : direction === 'down'
-        ? 'var(--dsw-alias-state-error-primary)'
-        : 'var(--dsw-alias-brand-primary)'
-  const [lastX, lastY] = coords[coords.length - 1].split(',')
+  const x = (index: number): number => pad + (index / (recent.length - 1)) * (width - pad * 2)
+  const y = (value: number): number => pad + (1 - (value - min) / (max - min)) * (height - pad * 2)
+  // Same capability-band coloring as the full trend chart (buildSegments).
+  const segments = buildSegments(values, x, y)
+  const lastPoint = [x(recent.length - 1).toFixed(1), y(values[values.length - 1]).toFixed(1)] as const
   return (
     <svg className="dsh_mr_liveSpark" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
-      <polyline points={coords.join(' ')} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={lastX} cy={lastY} r="1.8" fill={color} />
+      {segments.map((segment, index) => (
+        <path
+          key={index}
+          d={segment.path}
+          fill="none"
+          stroke={segment.color}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ))}
+      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="1.8" fill={bandColor(iqBand(values[values.length - 1]))} />
     </svg>
   )
 }
@@ -229,18 +232,22 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
   const detailTier =
     viewTierKey !== null ? (view.tiers.find((candidate) => candidate.key === viewTierKey) ?? tier) : tier
   const viewingSessionTier = detailTier.key === tier.key
-  const series = view.series[detailTier.key] ?? []
-  const taskRows = view.taskRates[detailTier.key] ?? []
-  const trend = trendSummary(series)
-  const direction = trend?.direction ?? 'flat'
-  const deltaText =
-    trend === null
+  // The capsule always reflects the session-matched tier: viewing another
+  // tier in the popover must not change the readout's IQ, delta, or sparkline.
+  const capsuleSeries = view.series[tier.key] ?? []
+  const capsuleTrend = trendSummary(capsuleSeries)
+  const capsuleDirection = capsuleTrend?.direction ?? 'flat'
+  const capsuleDeltaText =
+    capsuleTrend === null
       ? '—'
-      : direction === 'flat'
+      : capsuleDirection === 'flat'
         ? '±0.0'
-        : `${trend.delta24h > 0 ? '+' : ''}${trend.delta24h.toFixed(1)}`
-  const arrow = direction === 'up' ? '↑' : direction === 'down' ? '↓' : '→'
+        : `${capsuleTrend.delta24h > 0 ? '+' : ''}${capsuleTrend.delta24h.toFixed(1)}`
+  const capsuleArrow = capsuleDirection === 'up' ? '↑' : capsuleDirection === 'down' ? '↓' : '→'
   const displayedIq = `${match.approximate ? '≈' : ''}${tier.iq.toFixed(1)}`
+
+  const detailSeries = view.series[detailTier.key] ?? []
+  const detailTaskRows = view.taskRates[detailTier.key] ?? []
 
   const badges: Array<{ label: string; value: string; accent?: boolean; band?: string }> = [
     { label: t('badge.iq'), value: detailTier.iq.toFixed(1), accent: true, band: iqBand(detailTier.iq) },
@@ -295,8 +302,8 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
               </div>
               <div className="dsh_mr_card">
                 <span className="dsh_mr_cardTitle">{t('line.title')}</span>
-                {series.length >= 2 ? (
-                  <TrendLine points={series} t={t} />
+                {detailSeries.length >= 2 ? (
+                  <TrendLine points={detailSeries} t={t} />
                 ) : (
                   <div className="dsh_mr_empty">{t('empty.noSeries')}</div>
                 )}
@@ -305,8 +312,8 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
                 <span className="dsh_mr_cardTitle">
                   {fmt(t('bar.title'), { label: view.scoreLabel })}
                 </span>
-                {taskRows.length > 0 ? (
-                  <TaskBars rows={taskRows} benchmark={view.benchmark} scoringMode={view.scoringMode} t={t} scroll={false} />
+                {detailTaskRows.length > 0 ? (
+                  <TaskBars rows={detailTaskRows} benchmark={view.benchmark} scoringMode={view.scoringMode} t={t} scroll={false} />
                 ) : (
                   <div className="dsh_mr_empty">{t('empty.none')}</div>
                 )}
@@ -333,9 +340,17 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
         title={`${selection.model}${selection.reasoningEffort ? ` · ${selection.reasoningEffort}` : ''} · ${tier.key}`}
       >
         <span className="dsh_mr_liveLabel">{t('live.label')}</span>
-        <strong className="dsh_mr_liveIq">{displayedIq}</strong>
-        <span className="dsh_mr_liveDelta" data-dir={direction}>{arrow} {deltaText}</span>
-        <MiniTrend points={series} direction={direction} />
+        <strong
+          className="dsh_mr_liveIq"
+          style={{
+            color: bandColor(iqBand(tier.iq)),
+            background: `color-mix(in srgb, ${bandColor(iqBand(tier.iq))} 12%, transparent)`,
+          }}
+        >
+          {displayedIq}
+        </strong>
+        <span className="dsh_mr_liveDelta" data-dir={capsuleDirection}>{capsuleArrow} {capsuleDeltaText}</span>
+        <MiniTrend points={capsuleSeries} />
       </button>
       {popover}
     </>

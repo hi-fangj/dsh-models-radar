@@ -502,7 +502,7 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_trendStat strong { font-size: 12px; }
 .dsh_mr_trendStat strong[data-dir="up"] { color: var(--dsw-alias-state-success-primary); }
 .dsh_mr_trendStat strong[data-dir="down"] { color: var(--dsw-alias-state-error-primary); }
-.dsh_mr_trendStat strong[data-dir="flat"] { color: var(--dsw-alias-brand-primary); }
+.dsh_mr_trendStat strong[data-dir="flat"] { color: var(--dsw-alias-label-secondary); }
 .dsh_mr_trendWrap { position: relative; min-width: 0; }
 .dsh_mr_trendWrap svg { display: block; width: 100%; height: auto; }
 .dsh_mr_tip {
@@ -573,7 +573,15 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
   justify-self: start;
 }
 .dsh_mr_liveLabel { color: var(--dsw-alias-label-secondary); font-size: 10.5px; }
-.dsh_mr_liveIq { font-size: 12.5px; line-height: 18px; }
+/* The IQ value sits in a small band-tinted chip; color/background are inline
+   (band color + color-mix tint) so the band semantics cannot be lost to
+   selector or ordering issues. */
+.dsh_mr_liveIq {
+  font-size: 12.5px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 7px;
+}
 .dsh_mr_liveReadout[data-band="low"] .dsh_mr_liveIq { color: var(--dsw-alias-state-error-primary); }
 .dsh_mr_liveReadout[data-band="general"] .dsh_mr_liveIq { color: var(--dsw-alias-state-warn-primary); }
 .dsh_mr_liveReadout[data-band="steady"] .dsh_mr_liveIq { color: ${STEADY_COLOR}; }
@@ -582,7 +590,7 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
 .dsh_mr_liveDelta { font-size: 10.5px; }
 .dsh_mr_liveDelta[data-dir="up"] { color: var(--dsw-alias-state-success-primary); }
 .dsh_mr_liveDelta[data-dir="down"] { color: var(--dsw-alias-state-error-primary); }
-.dsh_mr_liveDelta[data-dir="flat"] { color: var(--dsw-alias-brand-primary); }
+.dsh_mr_liveDelta[data-dir="flat"] { color: var(--dsw-alias-label-secondary); }
 .dsh_mr_liveSpark { display: block; flex: none; width: 72px; height: 18px; }
 /* The capability popover: a non-modal anchored panel above the readout,
    portaled to body, rendered at the shell's menu elevation. */

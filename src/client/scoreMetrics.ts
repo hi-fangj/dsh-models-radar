@@ -11,6 +11,17 @@ export type TrendDirection = 'up' | 'down' | 'flat'
  */
 export const STEADY_COLOR = 'var(--dsw-alias-brand-primary-new-colorprimary-new-color)'
 
+/** The band color used by trend strokes, fills, endpoints, and hover markers. */
+export function bandColor(band: IqBand): string {
+  switch (band) {
+    case 'low': return 'var(--dsw-alias-state-error-primary)'
+    case 'general': return 'var(--dsw-alias-state-warn-primary)'
+    case 'steady': return STEADY_COLOR
+    case 'excellent':
+    case 'leading': return 'var(--dsw-alias-state-success-primary)'
+  }
+}
+
 /** Fixed cross-channel IQ bands recorded in CONTEXT.md. */
 export function iqBand(iq: number): IqBand {
   if (iq >= 100) return 'leading'

@@ -4,7 +4,7 @@ import type { MouseEvent } from 'react'
 import type { ModelRadarKey } from './locales.ts'
 import { fmt } from './locales.ts'
 import { PersistentScrollFrame } from './ScrollFrame.tsx'
-import { iqBand, STEADY_COLOR, trendSummary } from './scoreMetrics.ts'
+import { bandColor, iqBand, trendSummary } from './scoreMetrics.ts'
 import type { IqBand } from './scoreMetrics.ts'
 
 const TREND_W = 640
@@ -29,17 +29,6 @@ type TaskRow = [string, number, boolean?]
 type TaskCategory = 'pass' | 'split' | 'fail' | 'excellent' | 'good' | 'general' | 'low'
 type TaskMode = 'binary' | 'continuous'
 
-/** The band color used for trend strokes, endpoints, and hover markers. */
-function bandColor(band: IqBand): string {
-  switch (band) {
-    case 'low': return 'var(--dsw-alias-state-error-primary)'
-    case 'general': return 'var(--dsw-alias-state-warn-primary)'
-    case 'steady': return STEADY_COLOR
-    case 'excellent':
-    case 'leading': return 'var(--dsw-alias-state-success-primary)'
-  }
-}
-
 const two = (n: number): string => (n < 10 ? `0${n}` : String(n))
 
 function formatStamp(iso: string, withTime: boolean): string {
@@ -54,7 +43,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /** One painted polyline piece: a band color plus an SVG path and its x extent. */
-interface PaintedPiece {
+export interface PaintedPiece {
   color: string
   path: string
   x0: number
@@ -65,9 +54,10 @@ interface PaintedPiece {
  * Split a trend into capability-band-colored polylines. Adjacent sample
  * points in the same band merge into one path; a segment crossing a band
  * boundary is split exactly at the boundary IQ (linear interpolation), with
- * the boundary point itself belonging to the upper band.
+ * the boundary point itself belonging to the upper band. Shared by the full
+ * trend chart and the capsule sparkline.
  */
-function buildSegments(values: number[], x: (index: number) => number, y: (value: number) => number): PaintedPiece[] {
+export function buildSegments(values: number[], x: (index: number) => number, y: (value: number) => number): PaintedPiece[] {
   const pieces: Array<{ color: string; d: string[]; x0: number; x1: number }> = []
   const add = (color: string, point: [number, number]): void => {
     const last = pieces[pieces.length - 1]
