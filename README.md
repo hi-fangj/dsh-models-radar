@@ -50,6 +50,26 @@ The build produces:
 - `lib/index.js`: Host ESM bundle
 - `lib/client.js`: browser CJS bundle wrapped in the DSH `ModuleLoader` handshake
 
+### DSH CLI Installation (Recommended)
+
+After building, add the local package to the `web` profile:
+
+```bash
+dsh plugin --profile web add /absolute/path/to/dsh-models-radar
+```
+
+`dsh plugin` delegates dependency installation to the selected profile, so this command installs the package into `~/.dsh/profiles/web`. The source repository does not commit generated `lib/` files; always run `npm ci` and `npm run build` before adding a fresh clone.
+
+Refresh `http://127.0.0.1:3080` after installation. If the currently running DSH process does not hot-load the newly added package, restart DSH once and refresh the page.
+
+To remove this CLI-installed dependency:
+
+```bash
+dsh plugin --profile web remove dsh-models-radar
+```
+
+Restart DSH after removal so the profile is recomposed without the plugin.
+
 ### Runtime Injection
 
 Runtime injection is the fastest way to try the plugin. In a DSH session, ask the Agent to call:

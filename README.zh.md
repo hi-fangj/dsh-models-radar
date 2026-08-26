@@ -50,6 +50,26 @@ npm run build
 - `lib/index.js`：Host ESM bundle
 - `lib/client.js`：带 DSH `ModuleLoader` 握手的浏览器 CJS bundle
 
+### 使用 DSH CLI 安装（推荐）
+
+构建完成后，将本地插件包加入 `web` profile：
+
+```bash
+dsh plugin --profile web add /插件绝对路径/dsh-models-radar
+```
+
+`dsh plugin` 会把依赖安装操作交给指定 profile，因此该命令会把插件安装到 `~/.dsh/profiles/web`。源码仓库不提交生成的 `lib/` 文件；每次安装全新 clone 前，必须先执行 `npm ci` 和 `npm run build`。
+
+安装后刷新 `http://127.0.0.1:3080`。如果当前运行的 DSH 进程没有自动热加载新包，请重启一次 DSH，然后刷新页面。
+
+移除通过 CLI 安装的依赖：
+
+```bash
+dsh plugin --profile web remove dsh-models-radar
+```
+
+移除后重启 DSH，使 profile 在不包含该插件的情况下重新装配。
+
 ### 运行时注入
 
 运行时注入适合快速试用。在 DSH 会话中让 Agent 调用：
