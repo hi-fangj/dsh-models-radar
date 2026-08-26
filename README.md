@@ -48,7 +48,7 @@ The equivalent full Git URL is:
 dsh plugin --profile web add git+https://github.com/hi-fangj/dsh-models-radar.git
 ```
 
-Git dependency installation runs the package's `prepare` lifecycle, which installs the build dependency and generates `lib/index.js` and `lib/client.js` before DSH loads the plugin. Refresh `http://127.0.0.1:3080` after installation; restart DSH once if the running process does not hot-load the new package.
+The repository includes the built Host and browser bundles required by DSH, so direct Git installation does not run dependency lifecycle scripts and does not require a pnpm build allowlist. Refresh `http://127.0.0.1:3080` after installation; restart DSH once if the running process does not hot-load the new package.
 
 To remove the Git-installed package:
 
@@ -80,7 +80,7 @@ After building, add the local package to the `web` profile:
 dsh plugin --profile web add /absolute/path/to/dsh-models-radar
 ```
 
-`dsh plugin` delegates dependency installation to the selected profile, so this command installs the package into `~/.dsh/profiles/web`. The source repository does not commit generated `lib/` files; always run `npm ci` and `npm run build` before adding a fresh clone.
+`dsh plugin` delegates dependency installation to the selected profile, so this command installs the package into `~/.dsh/profiles/web`. The repository includes built bundles for direct Git installation; after making local source changes, run `npm run build` before adding or reloading the local clone.
 
 Refresh `http://127.0.0.1:3080` after installation. If the currently running DSH process does not hot-load the newly added package, restart DSH once and refresh the page.
 

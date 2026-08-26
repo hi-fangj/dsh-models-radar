@@ -48,7 +48,7 @@ dsh plugin --profile web add github:hi-fangj/dsh-models-radar
 dsh plugin --profile web add git+https://github.com/hi-fangj/dsh-models-radar.git
 ```
 
-Git dependency 安装时会自动执行 package 的 `prepare` 生命周期：安装构建依赖并生成 `lib/index.js`、`lib/client.js`，然后 DSH 才加载插件。安装后刷新 `http://127.0.0.1:3080`；如果当前进程没有自动热加载新包，请重启一次 DSH。
+仓库已包含 DSH 所需的 Host 和浏览器构建产物，因此从 Git 直接安装不需要执行 dependency lifecycle script，也不需要配置 pnpm build allowlist。安装后刷新 `http://127.0.0.1:3080`；如果当前进程没有自动热加载新包，请重启一次 DSH。
 
 移除通过 Git 安装的插件：
 
@@ -80,7 +80,7 @@ npm run build
 dsh plugin --profile web add /插件绝对路径/dsh-models-radar
 ```
 
-`dsh plugin` 会把依赖安装操作交给指定 profile，因此该命令会把插件安装到 `~/.dsh/profiles/web`。源码仓库不提交生成的 `lib/` 文件；每次安装全新 clone 前，必须先执行 `npm ci` 和 `npm run build`。
+`dsh plugin` 会把依赖安装操作交给指定 profile，因此该命令会把插件安装到 `~/.dsh/profiles/web`。仓库已包含从 Git 安装所需的构建产物；修改本地源码后，需要先执行 `npm run build`，再添加或重载该本地 clone。
 
 安装后刷新 `http://127.0.0.1:3080`。如果当前运行的 DSH 进程没有自动热加载新包，请重启一次 DSH，然后刷新页面。
 
