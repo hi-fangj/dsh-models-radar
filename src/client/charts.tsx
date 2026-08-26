@@ -4,17 +4,41 @@ import type { MouseEvent } from 'react'
 import type { ModelRadarKey } from './locales.ts'
 import { fmt } from './locales.ts'
 import { PersistentScrollFrame } from './ScrollFrame.tsx'
-import { trendSummary } from './scoreMetrics.ts'
+import { iqBand, trendSummary } from './scoreMetrics.ts'
+import type { IqBand } from './scoreMetrics.ts'
 
 const TREND_W = 640
 const TREND_H = 190
 const PAD = { top: 16, right: 14, bottom: 26, left: 46 }
 const AXIS_STYLE = { fontSize: 10.5, fill: 'var(--dsw-alias-label-secondary)' } as const
 
+/** Capability-band boundaries drawn as reference lines; see CONTEXT.md. */
+const BAND_BOUNDARIES = [70, 85, 95, 100]
+
+/** Band display names (tooltip), keyed into the model-radar locale namespace. */
+const BAND_LABEL: Record<IqBand, ModelRadarKey> = {
+  low: 'level.low',
+  general: 'level.general',
+  steady: 'level.steady',
+  excellent: 'level.excellent',
+  leading: 'level.leading',
+}
+
 type Translate = (key: ModelRadarKey) => string
 type TaskRow = [string, number, boolean?]
 type TaskCategory = 'pass' | 'split' | 'fail' | 'excellent' | 'good' | 'general' | 'low'
 type TaskMode = 'binary' | 'continuous'
+
+/** The band color used for trend strokes, endpoints, and hover markers. */
+function bandColor(band: IqBand): string {
+  switch (band) {
+    case 'low': return 'var(--dsw-alias-state-error-primary)'
+    case 'general': return 'var(--dsw-alias-state-warn-primary)'
+    case 'steady': return 'var(--dsw-alias-brand-primary)'
+    case 'excellent':
+    case 'leading': return 'var(--dsw-alias-state-success-primary)'
+  }
+}
 
 const two = (n: number): string => (n < 10 ? `0${n}` : String(n))
 
@@ -48,6 +72,51 @@ function smoothPath(points: Array<[number, number]>, minY: number, maxY: number)
   return path
 }
 
+/** One painted polyline piece: a band color plus an SVG path. */
+interface PaintedPiece {
+  color: string
+  path: string
+}
+
+/**
+ * Split a trend into capability-band-colored polylines. Adjacent sample
+ * points in the same band merge into one path; a segment crossing a band
+ * boundary is split exactly at the boundary IQ (linear interpolation), with
+ * the boundary point itself belonging to the upper band.
+ */
+function buildSegments(values: number[], x: (index: number) => number, y: (value: number) => number): PaintedPiece[] {
+  const pieces: Array<{ color: string; d: string[] }> = []
+  const add = (color: string, point: [number, number]): void => {
+    const last = pieces[pieces.length - 1]
+    if (last !== undefined && last.color === color) {
+      last.d.push(`L ${point[0].toFixed(1)} ${point[1].toFixed(1)}`)
+    } else {
+      pieces.push({ color, d: [`M ${point[0].toFixed(1)} ${point[1].toFixed(1)}`] })
+    }
+  }
+  for (let i = 0; i < values.length - 1; i++) {
+    const v0 = values[i]
+    const v1 = values[i + 1]
+    let from: [number, number] = [x(i), y(v0)]
+    let band = iqBand(v0)
+    const crossings = BAND_BOUNDARIES.filter(
+      (boundary) => boundary > Math.min(v0, v1) && boundary < Math.max(v0, v1),
+    )
+    if (v1 < v0) crossings.reverse()
+    for (const boundary of crossings) {
+      const ratio = (boundary - v0) / (v1 - v0)
+      const point: [number, number] = [x(i) + (x(i + 1) - x(i)) * ratio, y(boundary)]
+      add(bandColor(band), from)
+      add(bandColor(band), point)
+      from = point
+      band = iqBand(boundary)
+    }
+    add(bandColor(band), from)
+    add(bandColor(band), [x(i + 1), y(v1)])
+  }
+  return pieces.map(({ color, d }) => ({ color, path: d.join(' ') }))
+}
+
 export function TrendLine({ points, t }: { points: Array<[string, number]>; t: Translate }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const summary = trendSummary(points)
@@ -75,24 +144,32 @@ export function TrendLine({ points, t }: { points: Array<[string, number]>; t: T
     const line = smoothPath(coordinates, PAD.top, TREND_H - PAD.bottom)
     const baseline = TREND_H - PAD.bottom
     const area = `${line} L ${coordinates[coordinates.length - 1][0].toFixed(1)} ${baseline} L ${coordinates[0][0].toFixed(1)} ${baseline} Z`
-    return { lo, hi, x, y, line, area, last: points.length - 1 }
+    return {
+      lo,
+      hi,
+      x,
+      y,
+      line,
+      area,
+      last: points.length - 1,
+      segments: buildSegments(points.map(([, value]) => value), x, y),
+      bandLines: BAND_BOUNDARIES.map((boundary) => ({ boundary, py: y(boundary) }))
+        .filter(({ py }) => py >= PAD.top - 0.5 && py <= TREND_H - PAD.bottom + 0.5),
+    }
   }, [points])
 
   if (geometry === null || summary === null) return <div className="dsh_mr_empty" />
 
-  const { lo, hi, x, y, line, area, last } = geometry
+  const { lo, hi, x, y, area, last, segments, bandLines } = geometry
   const mid = (lo + hi) / 2
   const hovered = hoverIndex !== null ? points[hoverIndex] : undefined
   const deltaText =
     summary.direction === 'flat'
       ? '±0.0'
       : `${summary.delta24h > 0 ? '+' : ''}${summary.delta24h.toFixed(1)}`
-  const endpointColor =
-    summary.direction === 'up'
-      ? 'var(--dsw-alias-state-success-primary)'
-      : summary.direction === 'down'
-        ? 'var(--dsw-alias-state-error-primary)'
-        : 'var(--dsw-alias-brand-primary)'
+  // The endpoint and hover markers carry the capability band color: the
+  // momentum semantics live in the delta badge and trend stats instead.
+  const endpointColor = bandColor(iqBand(points[last][1]))
 
   return (
     <>
@@ -124,12 +201,20 @@ export function TrendLine({ points, t }: { points: Array<[string, number]>; t: T
               <text x={PAD.left - 6} y={y(value) + 3.5} textAnchor="end" style={AXIS_STYLE}>{value.toFixed(1)}</text>
             </g>
           ))}
+          {bandLines.map(({ boundary, py }) => (
+            <g key={boundary}>
+              <line x1={PAD.left} x2={TREND_W - PAD.right} y1={py} y2={py} stroke="var(--dsw-alias-border-l2)" strokeDasharray="2 4" />
+              <text x={TREND_W - PAD.right + 6} y={py + 3.5} textAnchor="start" style={{ ...AXIS_STYLE, fontSize: 9 }}>{boundary}</text>
+            </g>
+          ))}
           <path d={area} fill="var(--dsw-alias-brand-primary)" fillOpacity="0.09" />
-          <path d={line} fill="none" stroke="var(--dsw-alias-brand-primary)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          {segments.map((segment, index) => (
+            <path key={index} d={segment.path} fill="none" stroke={segment.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          ))}
           {hovered !== undefined && hoverIndex !== null && (
             <>
               <line x1={x(hoverIndex)} x2={x(hoverIndex)} y1={PAD.top} y2={TREND_H - PAD.bottom} stroke="var(--dsw-alias-border-l2)" />
-              <circle cx={x(hoverIndex)} cy={y(hovered[1])} r="3" fill="var(--dsw-alias-bg-layer-1)" stroke="var(--dsw-alias-brand-primary)" strokeWidth="2" />
+              <circle cx={x(hoverIndex)} cy={y(hovered[1])} r="3" fill="var(--dsw-alias-bg-layer-1)" stroke={bandColor(iqBand(hovered[1]))} strokeWidth="2" />
             </>
           )}
           <circle cx={x(last)} cy={y(points[last][1])} r="3.8" fill={endpointColor} />
@@ -139,7 +224,7 @@ export function TrendLine({ points, t }: { points: Array<[string, number]>; t: T
         </svg>
         {hovered !== undefined && hoverIndex !== null && (
           <div className="dsh_mr_tip" style={{ left: `${(x(hoverIndex) / TREND_W) * 100}%`, top: `${(y(hovered[1]) / TREND_H) * 100}%` }}>
-            {formatStamp(hovered[0], true)} · {hovered[1].toFixed(1)}
+            {formatStamp(hovered[0], true)} · {hovered[1].toFixed(1)} {t(BAND_LABEL[iqBand(hovered[1])])}
           </div>
         )}
       </div>
