@@ -27,9 +27,20 @@ export const inject = ['webServer']
 
 const UPSTREAM = 'https://api.codexradar.com/api/v1'
 const ROUTE_PREFIX = '/model-radar'
-/** Same data within this window is served from memory instead of upstream. */
-const THROTTLE_MS = 60_000
 const FETCH_TIMEOUT_MS = 30_000
+
+/**
+ * Freshness windows per upstream dataset (docs/adr/0002-freshness-window.md):
+ * data served inside its window costs zero upstream hits; beyond it the
+ * dataset is refetched on the next trigger. An explicit manual refresh
+ * (`bypass=1`) ignores the windows. Windows are hardcoded — no user setting.
+ */
+const FRESH_BENCHMARKS_MS = 60 * 60_000 // channel list: near-static
+const FRESH_EFFICIENCY_MS = 15 * 60_000 // overview + capability readout
+const FRESH_LEADERBOARD_MS = 15 * 60_000 // per-task composition
+const FRESH_HISTORY_MS = 60 * 60_000 // trend: upstream adds one point/hour
+/** Wholesale cold-start window: a persisted snapshot this fresh is served without touching upstream. */
+const FRESH_SNAPSHOT_MS = FRESH_EFFICIENCY_MS
 
 // ---------------------------------------------------------------------------
 // Loose upstream faces: only the leaves this plugin actually reads. Anything
@@ -82,9 +93,10 @@ interface UpLeaderboard {
   models?: UpLbModel[]
 }
 
-interface CacheEntry {
+/** One cached upstream dataset: `at` is the fetch-success moment backing its freshness window. */
+interface DatasetEntry<T = unknown> {
   at: number
-  view: RadarView
+  value: T
 }
 
 const num = (value: unknown): number | null =>
@@ -111,21 +123,44 @@ async function fetchJson<T>(pathAndQuery: string): Promise<T> {
   return (await response.json()) as T
 }
 
+/** Dataset cache keys of one channel (all but `benchmarks` are channel-scoped). */
+const DATASETS = (benchmark: string): Array<{ key: string; ttlMs: number }> => [
+  { key: 'benchmarks', ttlMs: FRESH_BENCHMARKS_MS },
+  { key: `eff:${benchmark}`, ttlMs: FRESH_EFFICIENCY_MS },
+  { key: `hist:${benchmark}`, ttlMs: FRESH_HISTORY_MS },
+  { key: `lb:${benchmark}`, ttlMs: FRESH_LEADERBOARD_MS },
+]
+
+/** Bound per-dataset resolve: fresh entries never touch upstream; stale/missing ones do. */
+type EnsureFn = <T>(
+  key: string,
+  ttlMs: number,
+  pathAndQuery: string,
+) => Promise<{ value: T; at: number; upstream: boolean }>
+
 /**
- * Compose the view model for one benchmark channel from four upstream reads.
- * Any failure rejects — callers fall back to the stored snapshot wholesale,
+ * Compose the view model for one benchmark channel from its four upstream
+ * datasets. Each dataset resolves per its own freshness window (see
+ * FRESH_*_MS), so an expired dataset alone is refetched while fresh ones are
+ * reused from cache — the view is a mixed assembly. `fetchedAt` is the oldest
+ * dataset moment in the assembly, honestly reporting the view's data currency.
+ * Any failure rejects — callers fall back to the last snapshot wholesale,
  * which keeps "what the UI shows" always internally consistent.
  */
-async function buildViewModel(benchmark: string, defaultModel: RadarView['defaultModel']): Promise<RadarView> {
+async function buildViewModel(
+  benchmark: string,
+  defaultModel: RadarView['defaultModel'],
+  ensure: EnsureFn,
+): Promise<{ view: RadarView; upstreamHits: number }> {
   const encoded = encodeURIComponent(benchmark)
   const [bench, eff, hist, lb] = await Promise.all([
-    fetchJson<UpBenchmarks>('/benchmarks'),
-    fetchJson<UpEfficiency>(`/intelligence-efficiency?benchmark=${encoded}`),
-    fetchJson<UpHistory>(`/iq-history?benchmark=${encoded}`),
-    fetchJson<UpLeaderboard>(`/leaderboard?benchmark=${encoded}`),
+    ensure<UpBenchmarks>('benchmarks', FRESH_BENCHMARKS_MS, '/benchmarks'),
+    ensure<UpEfficiency>(`eff:${benchmark}`, FRESH_EFFICIENCY_MS, `/intelligence-efficiency?benchmark=${encoded}`),
+    ensure<UpHistory>(`hist:${benchmark}`, FRESH_HISTORY_MS, `/iq-history?benchmark=${encoded}`),
+    ensure<UpLeaderboard>(`lb:${benchmark}`, FRESH_LEADERBOARD_MS, `/leaderboard?benchmark=${encoded}`),
   ])
 
-  const channels: RadarChannel[] = (bench.benchmarks ?? [])
+  const channels: RadarChannel[] = (bench.value.benchmarks ?? [])
     .filter((b): b is typeof b & { id: string } => typeof b.id === 'string')
     .map((b) => ({
       id: b.id,
@@ -136,7 +171,7 @@ async function buildViewModel(benchmark: string, defaultModel: RadarView['defaul
 
   // Tier key → per-task rows sorted by rate desc (then id, for stable order).
   const taskRates = new Map<string, Array<[string, number, boolean?]>>()
-  for (const model of lb.models ?? []) {
+  for (const model of lb.value.models ?? []) {
     if (typeof model.model !== 'string' || typeof model.effort !== 'string') continue
     const key = `${model.model}@${model.effort}`
     const rows = Object.entries(model.tasks ?? {}).map(([taskId, task]): [string, number, boolean?] => [
@@ -150,7 +185,7 @@ async function buildViewModel(benchmark: string, defaultModel: RadarView['defaul
 
   const tiers: RadarTier[] = []
   const series: Record<string, Array<[string, number]>> = {}
-  for (const point of eff.points ?? []) {
+  for (const point of eff.value.points ?? []) {
     if (typeof point.model !== 'string' || typeof point.effort !== 'string') continue
     const key = `${point.model}@${point.effort}`
     const total = num(point.total) ?? 0
@@ -170,7 +205,7 @@ async function buildViewModel(benchmark: string, defaultModel: RadarView['defaul
     })
     // Prefer the exact tier series; fall back to the base-model series when
     // the site has not split this tier out yet.
-    const entries = hist[key] ?? hist[point.model]
+    const entries = hist.value[key] ?? hist.value[point.model]
     if (Array.isArray(entries) && entries.length > 0) {
       series[key] = entries
         .filter((e): e is typeof e & { ts: string } => typeof e.ts === 'string')
@@ -180,16 +215,19 @@ async function buildViewModel(benchmark: string, defaultModel: RadarView['defaul
   tiers.sort((a, b) => b.iq - a.iq)
 
   return {
-    benchmark,
-    scoringMode: typeof eff.scoring_mode === 'string' ? eff.scoring_mode : undefined,
-    scoreLabel: typeof eff.score_label === 'string' ? eff.score_label : '',
-    fetchedAt: new Date().toISOString(),
-    sourceUpdatedAt: typeof eff.source_updated_at === 'string' ? eff.source_updated_at : undefined,
-    defaultModel,
-    channels,
-    tiers,
-    taskRates: Object.fromEntries(taskRates),
-    series,
+    view: {
+      benchmark,
+      scoringMode: typeof eff.value.scoring_mode === 'string' ? eff.value.scoring_mode : undefined,
+      scoreLabel: typeof eff.value.score_label === 'string' ? eff.value.score_label : '',
+      fetchedAt: new Date(Math.min(bench.at, eff.at, hist.at, lb.at)).toISOString(),
+      sourceUpdatedAt: typeof eff.value.source_updated_at === 'string' ? eff.value.source_updated_at : undefined,
+      defaultModel,
+      channels,
+      tiers,
+      taskRates: Object.fromEntries(taskRates),
+      series,
+    },
+    upstreamHits: Number(bench.upstream) + Number(eff.upstream) + Number(hist.upstream) + Number(lb.upstream),
   }
 }
 
@@ -198,8 +236,17 @@ async function buildViewModel(benchmark: string, defaultModel: RadarView['defaul
  * @param ctx - host cordis context.
  */
 export function apply(ctx: Context): void {
-  /** Per-benchmark in-memory throttle cache. */
-  const memo = new Map<string, CacheEntry>()
+  /**
+   * Per-dataset freshness cache (docs/adr/0002-freshness-window.md): each
+   * upstream dataset of each channel resolves independently within its own
+   * window, so a stale dataset alone is refetched while fresh ones are reused.
+   * `benchmarks` is channel-global (the channel list does not vary by channel).
+   */
+  const datasets = new Map<string, DatasetEntry>()
+  /** Single-flight: one upstream fetch per dataset key, whichever request started it. */
+  const inflight = new Map<string, Promise<unknown>>()
+  /** Last successfully assembled view per channel: wholesale fast path + failure fallback. */
+  const lastView = new Map<string, RadarView>()
   /** Last timeline hash per benchmark (in-memory; restart may append one dup). */
   const lastHash = new Map<string, string>()
 
@@ -245,6 +292,47 @@ export function apply(ctx: Context): void {
     }
   }
 
+  /**
+   * Resolve one dataset within its freshness window. Fresh entries are served
+   * from cache without touching upstream; stale/missing ones are fetched
+   * (single-flight: concurrent requests share one upstream call). `bypass`
+   * forces a fresh fetch (manual refresh) but still joins an in-flight call.
+   */
+  const ensureRaw = async <T>(key: string, ttlMs: number, pathAndQuery: string, bypass: boolean) => {
+    const now = Date.now()
+    const cached = datasets.get(key)
+    if (!bypass && cached !== undefined && now - cached.at < ttlMs) {
+      return { value: cached.value as T, at: cached.at, upstream: false }
+    }
+    const pending = inflight.get(key)
+    if (pending !== undefined) return (await pending) as { value: T; at: number; upstream: boolean }
+    const fetch = fetchJson<T>(pathAndQuery)
+      .then((value) => {
+        const at = Date.now()
+        datasets.set(key, { at, value })
+        return { value, at, upstream: true }
+      })
+      .finally(() => {
+        inflight.delete(key)
+      })
+    inflight.set(key, fetch)
+    return fetch
+  }
+
+  /**
+   * Freshness-window resolver, bound per request: serves cached datasets
+   * inside their window, fetches stale/missing ones (single-flight).
+   */
+  const ensure: EnsureFn = async <T>(key: string, ttlMs: number, pathAndQuery: string) =>
+    ensureRaw(key, ttlMs, pathAndQuery, false)
+
+  /**
+   * With-bypass resolver, bound per request: identical to `ensure` but skips
+   * every freshness window (the user explicitly asked for the latest).
+   */
+  const ensureBypass: EnsureFn = async <T>(key: string, ttlMs: number, pathAndQuery: string) =>
+    ensureRaw(key, ttlMs, pathAndQuery, true)
+
   const respond = (res: import('node:http').ServerResponse, status: number, body: unknown): void => {
     res.writeHead(status, {
       'content-type': 'application/json; charset=utf-8',
@@ -259,29 +347,78 @@ export function apply(ctx: Context): void {
       respond(res, 400, { ok: false, error: 'bad benchmark id' })
       return
     }
-    const cached = memo.get(benchmark)
+    const bypass = url.searchParams.get('bypass') === '1'
     const now = Date.now()
-    if (cached !== undefined && now - cached.at < THROTTLE_MS) {
-      respond(res, 200, {
-        ok: true,
-        fresh: true,
-        throttled: true,
-        fetchedAt: new Date(cached.at).toISOString(),
-        data: cached.view,
+
+    if (!bypass) {
+      // Wholesale fast path: every dataset of this channel is still within its
+      // window, so the last assembled view is served unchanged — zero upstream.
+      const allFresh = DATASETS(benchmark).every(({ key, ttlMs }) => {
+        const entry = datasets.get(key)
+        return entry !== undefined && now - entry.at < ttlMs
       })
-      return
+      const current = lastView.get(benchmark)
+      if (allFresh && current !== undefined) {
+        respond(res, 200, {
+          ok: true,
+          fresh: true,
+          throttled: true,
+          fetchedAt: current.fetchedAt,
+          data: current,
+        })
+        return
+      }
+      // Cold start (or no assembled view yet): a persisted snapshot within its
+      // window serves wholesale — a fresh process restart costs no upstream.
+      // A view that was itself served cold keeps serving within the window,
+      // since a snapshot serve never populates the per-dataset cache.
+      if (current === undefined) {
+        const saved = await readLatest(benchmark)
+        const savedAt = saved === undefined ? NaN : Date.parse(saved.fetchedAt)
+        if (saved !== undefined && Number.isFinite(savedAt) && now - savedAt < FRESH_SNAPSHOT_MS) {
+          lastView.set(benchmark, saved)
+          respond(res, 200, {
+            ok: true,
+            fresh: true,
+            throttled: true,
+            fetchedAt: saved.fetchedAt,
+            data: saved,
+          })
+          return
+        }
+      } else {
+        // Snapshot-served view: memory was left cold, so window it too.
+        const currentAt = Date.parse(current.fetchedAt)
+        if (Number.isFinite(currentAt) && now - currentAt < FRESH_SNAPSHOT_MS) {
+          respond(res, 200, {
+            ok: true,
+            fresh: true,
+            throttled: true,
+            fetchedAt: current.fetchedAt,
+            data: current,
+          })
+          return
+        }
+      }
     }
+
     try {
-      const view = await buildViewModel(benchmark, currentDefaultModel())
-      memo.set(benchmark, { at: now, view })
+      const { view, upstreamHits } = await buildViewModel(benchmark, currentDefaultModel(), bypass ? ensureBypass : ensure)
+      lastView.set(benchmark, view)
       void persist(view).catch((error: unknown) => {
         console.error(`[${name}] snapshot persist failed:`, error)
       })
-      respond(res, 200, { ok: true, fresh: true, fetchedAt: view.fetchedAt, data: view })
+      respond(res, 200, {
+        ok: true,
+        fresh: true,
+        throttled: upstreamHits === 0 || undefined,
+        fetchedAt: view.fetchedAt,
+        data: view,
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error(`[${name}] refresh failed (${benchmark}):`, message)
-      const last = cached?.view ?? (await readLatest(benchmark))
+      const last = lastView.get(benchmark) ?? (await readLatest(benchmark))
       if (last !== undefined) {
         respond(res, 200, { ok: true, fresh: false, stale: true, notice: message, fetchedAt: last.fetchedAt, data: last })
       } else {

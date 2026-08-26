@@ -62,7 +62,7 @@ export interface RadarView {
 export interface RadarPayload {
   ok: true
   fresh: boolean
-  /** Served from the ≤60s throttle window instead of hitting upstream. */
+  /** Served entirely from the freshness window (zero upstream hits this request). */
   throttled?: boolean
   stale?: boolean
   /** Why the live refresh failed (present only with `stale`). */

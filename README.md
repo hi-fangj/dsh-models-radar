@@ -23,7 +23,8 @@ A model capability radar plugin for the [DeepSeek Harness](https://github.com/de
   - current DeepSWE IQ
   - 24-hour delta
   - 48-hour sparkline
-- **Automatic refresh** when the Settings page opens, plus a 60-second host-side throttle
+- **Refresh within freshness windows**: overview & per-task composition 15 min, channel list & IQ trend 60 min; only expired datasets are refetched, everything else is served from cache (single-flight, zero upstream hits inside a window)
+- **Manual refresh** button in the footer (skips the windows) next to the last-fetch timestamp
 - **Offline fallback** to the latest persisted snapshot when the upstream API is unavailable
 - Chinese and English UI copy
 
@@ -126,7 +127,7 @@ Refresh the Web GUI after installation. The package will be assembled again from
 3. Choose `DeepSWE` or `Pompeii` at the top.
 4. Select a model tier from the overview or tier selector.
 
-The page refreshes automatically on open. Clicking a row in the overview changes the model tier used by the metrics, trend, and task diagnostics below it.
+The page refreshes on open within the freshness windows: data served from cache costs no upstream request, and only expired datasets are refetched. Clicking a row in the overview changes the model tier used by the metrics, trend, and task diagnostics below it.
 
 ### Capability Overview
 
@@ -158,7 +159,7 @@ Matching behavior:
 2. Best tier of the same base model, prefixed with `≈`
 3. Hidden when the base model does not exist in the DeepSWE leaderboard
 
-The readout updates immediately when the composer model changes. Benchmark data refreshes every 60 seconds; a failed refresh keeps the last successful value.
+The readout updates immediately when the composer model changes. The readout polls the host every 15 minutes (the shortest freshness window), so each tick costs one local request and an upstream fetch at most once per window per channel; a failed refresh keeps the last successful value.
 
 ## Update
 
@@ -228,10 +229,10 @@ Browser
             │
             ▼
 Host plugin
-  ├── 60-second per-channel memory cache
-  ├── parallel public API reads
+  ├── per-dataset freshness windows (15 min efficiency/leaderboard, 60 min benchmarks/history)
+  ├── single-flight upstream fetches + channel-global benchmarks cache
   ├── RadarView normalization
-  └── local snapshot persistence
+  └── local snapshot persistence (snapshots keep serving within their window after a restart)
 ```
 
 The composer readout subscribes to DSH's official `modelDirectories` per-session store, so model changes propagate without polling the model-selection state.

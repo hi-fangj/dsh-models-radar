@@ -7,7 +7,7 @@
 export const zh = {
   'nav': '模型能力',
   'title': '模型能力雷达',
-  'subtitle': '数据来自 deng.codexradar.com 众测看板，打开本页自动刷新。',
+  'subtitle': '数据来自 deng.codexradar.com 众测看板；15 分钟新鲜窗口内过期才拉取，也可手动刷新。',
   'overview.title': '能力总览 · 每基座最强档',
   'overview.hint': '点击任意行切换下方图表的档位',
   'level.leading': '领先',
@@ -37,6 +37,7 @@ export const zh = {
   'status.stale': '刷新失败，显示 {time} 的快照：{reason}',
   'status.failed': '加载失败：{reason}',
   'action.retry': '重试',
+  'action.refresh': '刷新',
   'match.hint': '未能在榜单中识别当前会话模型（{model}），请手动选择档位。',
   'empty.none': '该频道暂无任务明细',
   'empty.noSeries': '暂无趋势序列',
@@ -51,7 +52,7 @@ export type ModelRadarKey = keyof typeof zh
 export const en = {
   'nav': 'Model Radar',
   'title': 'Model capability radar',
-  'subtitle': 'Data from the deng.codexradar.com crowd benchmark; this page refreshes on every open.',
+  'subtitle': 'Data from the deng.codexradar.com crowd benchmark; refetches only after the 15-minute freshness window, or on manual refresh.',
   'overview.title': 'Capability overview · best effort per base model',
   'overview.hint': 'Click any row to switch the charts below to that tier',
   'level.leading': 'Leader',
@@ -81,6 +82,7 @@ export const en = {
   'status.stale': 'Refresh failed; showing the {time} snapshot: {reason}',
   'status.failed': 'Load failed: {reason}',
   'action.retry': 'Retry',
+  'action.refresh': 'Refresh',
   'match.hint': 'Could not match the session model ({model}) on the leaderboard — pick a tier manually.',
   'empty.none': 'No task detail for this channel yet',
   'empty.noSeries': 'No trend series yet',

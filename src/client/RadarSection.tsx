@@ -6,10 +6,11 @@
  * (see docs/adr/0001-host-proxy-fetch.md for why the browser cannot call the
  * benchmark site directly). Every tab activation remounts this component —
  * the settings shell renders one active section at a time — so mounting is
- * the refresh trigger, exactly as specced ("每次打开自动刷新"); the 60s
- * throttle lives server-side. On a failed live refresh the route serves the
- * last persisted snapshot flagged `stale`, which renders as a warning banner
- * above otherwise-normal charts plus a manual retry button.
+ * the refresh trigger; per-dataset freshness windows live server-side
+ * (docs/adr/0002-freshness-window.md). On a failed live refresh the route
+ * serves the last persisted snapshot flagged `stale`, which renders as a
+ * warning banner above otherwise-normal charts plus a manual retry button.
+ * A persistent footer refresh button passes `bypass=1` to skip the windows.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -21,7 +22,7 @@ import { iqBand } from './scoreMetrics.ts'
 
 /** Injected business face: the same-origin data loader. */
 export interface RadarInjected {
-  loadData: (benchmark: string, signal?: AbortSignal) => Promise<RadarPayload>
+  loadData: (benchmark: string, signal?: AbortSignal, bypass?: boolean) => Promise<RadarPayload>
 }
 
 /** Full section props: injected face + the locale seat (`t`). */
@@ -80,12 +81,12 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
   const loadSeq = useRef(0)
 
   const load = useCallback(
-    async (target: string) => {
+    async (target: string, bypass = false) => {
       const seq = ++loadSeq.current
       setLoading(true)
       setError(null)
       try {
-        const response = await loadData(target)
+        const response = await loadData(target, undefined, bypass)
         if (seq !== loadSeq.current) return
         if (response.ok) {
           setPayload(response)
@@ -268,6 +269,15 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
                 · {t('source.updated')}: {new Date(view.sourceUpdatedAt).toLocaleString()}
               </span>
             )}
+            <span className="dsh_mr_footerSpacer" />
+            <button
+              type="button"
+              className="dsh_mr_refresh"
+              onClick={() => void load(benchmark, true)}
+              disabled={loading}
+            >
+              {t('action.refresh')}
+            </button>
           </div>
         </>
       )}

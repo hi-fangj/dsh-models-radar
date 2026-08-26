@@ -18,9 +18,10 @@ import { RadarSection, type RadarInjected } from './RadarSection.tsx'
 /** Required services: slot registry, locale registry, and the official per-session model directory. */
 export const inject = ['slots', 'locale', 'modelDirectories']
 
-/** Same-origin GET against the host half's proxy route. */
-async function loadData(benchmark: string, signal?: AbortSignal): Promise<RadarPayload> {
-  const url = `/model-radar/api/data?benchmark=${encodeURIComponent(benchmark)}`
+/** Same-origin GET against the host half's proxy route. `bypass` skips the host's refresh window (manual refresh). */
+async function loadData(benchmark: string, signal?: AbortSignal, bypass = false): Promise<RadarPayload> {
+  const url =
+    `/model-radar/api/data?benchmark=${encodeURIComponent(benchmark)}` + (bypass ? '&bypass=1' : '')
   const response = await fetch(url, { signal })
   const body = (await response.json()) as RadarResponse
   if (!response.ok || body.ok !== true) {

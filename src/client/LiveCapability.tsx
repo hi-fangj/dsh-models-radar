@@ -11,9 +11,12 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RadarPayload, RadarTier, RadarView } from '../contract.ts'
 import { iqBand, trendSummary } from './scoreMetrics.ts'
 
+/** Dock polling period: matches the host's shortest freshness window (15 min, host-side FRESH_EFFICIENCY_MS). */
+const REFRESH_INTERVAL_MS = 15 * 60_000
+
 export interface LiveCapabilityInjected {
   modelDirectories: ModelDirectoryResolver
-  loadData: (benchmark: string, signal?: AbortSignal) => Promise<RadarPayload>
+  loadData: (benchmark: string, signal?: AbortSignal, bypass?: boolean) => Promise<RadarPayload>
 }
 
 export type LiveCapabilityProps = PropsRuntime<'conversation.composer.dock'> &
@@ -107,7 +110,10 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
       )
     }
     refresh()
-    const timer = window.setInterval(refresh, 60_000)
+    // Poll the host's shortest refresh window (15 min): the host serves fresh
+    // data from its cache without upstream hits, so each tick costs one local
+    // request and an upstream fetch at most once per window per channel.
+    const timer = window.setInterval(refresh, REFRESH_INTERVAL_MS)
     return () => {
       cancelled = true
       controller.abort()

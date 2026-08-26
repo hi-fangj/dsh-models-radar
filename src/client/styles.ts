@@ -118,6 +118,20 @@ export const cssText = `
   cursor: pointer;
 }
 .dsh_mr_retry:hover { border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-brand-primary); }
+.dsh_mr_refresh {
+  appearance: none;
+  flex: none;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 7px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.dsh_mr_refresh:hover { border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-brand-primary); }
+.dsh_mr_refresh:disabled { opacity: 0.5; cursor: default; }
 .dsh_mr_card {
   background: var(--dsw-alias-bg-layer-1);
   border: 1px solid var(--dsw-alias-border-l1);
@@ -529,6 +543,7 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
 .dsh_mr_dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .dsh_mr_dot[data-fresh="true"] { background: var(--dsw-alias-state-success-primary); }
 .dsh_mr_dot[data-fresh="false"] { background: var(--dsw-alias-state-warn-primary); }
+.dsh_mr_footerSpacer { flex: 1 1 auto; }
 @media (max-width: 640px) {
   .dsh_mr_trendStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dsh_mr_ovRow { grid-template-columns: 18px 16px minmax(0, 1fr) 58px 100px; gap: 5px; }
