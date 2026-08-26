@@ -591,7 +591,6 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
 .dsh_mr_liveDelta[data-dir="up"] { color: var(--dsw-alias-state-success-primary); }
 .dsh_mr_liveDelta[data-dir="down"] { color: var(--dsw-alias-state-error-primary); }
 .dsh_mr_liveDelta[data-dir="flat"] { color: var(--dsw-alias-label-secondary); }
-.dsh_mr_liveSpark { display: block; flex: none; width: 72px; height: 18px; }
 /* The capability popover: a non-modal anchored panel above the readout,
    portaled to body, rendered at the shell's menu elevation. */
 .dsh_mr_popover {
@@ -658,7 +657,6 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
 @media (max-width: 640px) {
   .dsh_mr_trendStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dsh_mr_ovRow { grid-template-columns: 18px 16px minmax(0, 1fr) 58px 100px; gap: 5px; }
-  .dsh_mr_liveSpark { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .dsh_mr_ovRow,

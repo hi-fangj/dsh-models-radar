@@ -43,7 +43,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /** One painted polyline piece: a band color plus an SVG path and its x extent. */
-export interface PaintedPiece {
+interface PaintedPiece {
   color: string
   path: string
   x0: number
@@ -54,10 +54,9 @@ export interface PaintedPiece {
  * Split a trend into capability-band-colored polylines. Adjacent sample
  * points in the same band merge into one path; a segment crossing a band
  * boundary is split exactly at the boundary IQ (linear interpolation), with
- * the boundary point itself belonging to the upper band. Shared by the full
- * trend chart and the capsule sparkline.
+ * the boundary point itself belonging to the upper band.
  */
-export function buildSegments(values: number[], x: (index: number) => number, y: (value: number) => number): PaintedPiece[] {
+function buildSegments(values: number[], x: (index: number) => number, y: (value: number) => number): PaintedPiece[] {
   const pieces: Array<{ color: string; d: string[]; x0: number; x1: number }> = []
   const add = (color: string, point: [number, number]): void => {
     const last = pieces[pieces.length - 1]

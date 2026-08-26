@@ -22,7 +22,7 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RadarPayload, RadarTier, RadarView } from '../contract.ts'
 import { bandColor, iqBand, trendSummary } from './scoreMetrics.ts'
 import { moneyText, minutesText, pctText } from './format.ts'
-import { TaskBars, TrendLine, buildSegments } from './charts.tsx'
+import { TaskBars, TrendLine } from './charts.tsx'
 import { TierOverview } from './Overview.tsx'
 import { fmt } from './locales.ts'
 
@@ -76,42 +76,6 @@ function matchTier(view: RadarView, selection: ModelSelection): TierMatch | null
     (tier) => normalizeModel(tier.model).includes(model) || model.includes(normalizeModel(tier.model)),
   )
   return fuzzy === undefined ? null : { tier: fuzzy, approximate: true }
-}
-
-function MiniTrend({ points }: { points: Array<[string, number]> }) {
-  const recent = points.slice(-49)
-  if (recent.length < 2) return null
-  const width = 72
-  const height = 18
-  const pad = 1.5
-  const values = recent.map((point) => point[1])
-  let min = Math.min(...values)
-  let max = Math.max(...values)
-  if (min === max) {
-    min -= 0.5
-    max += 0.5
-  }
-  const x = (index: number): number => pad + (index / (recent.length - 1)) * (width - pad * 2)
-  const y = (value: number): number => pad + (1 - (value - min) / (max - min)) * (height - pad * 2)
-  // Same capability-band coloring as the full trend chart (buildSegments).
-  const segments = buildSegments(values, x, y)
-  const lastPoint = [x(recent.length - 1).toFixed(1), y(values[values.length - 1]).toFixed(1)] as const
-  return (
-    <svg className="dsh_mr_liveSpark" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
-      {segments.map((segment, index) => (
-        <path
-          key={index}
-          d={segment.path}
-          fill="none"
-          stroke={segment.color}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      ))}
-      <circle cx={lastPoint[0]} cy={lastPoint[1]} r="1.8" fill={bandColor(iqBand(values[values.length - 1]))} />
-    </svg>
-  )
 }
 
 export function LiveCapability({ useSession, modelDirectories, loadData, t }: LiveCapabilityProps) {
@@ -350,7 +314,6 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
           {displayedIq}
         </strong>
         <span className="dsh_mr_liveDelta" data-dir={capsuleDirection}>{capsuleArrow} {capsuleDeltaText}</span>
-        <MiniTrend points={capsuleSeries} />
       </button>
       {popover}
     </>
