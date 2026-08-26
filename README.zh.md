@@ -34,9 +34,31 @@
 - Node.js 22 或更高版本
 - npm
 
-## 从源码安装
+## 从 Git 直接安装
 
-克隆并构建插件：
+最简单的安装方式是直接将 GitHub 仓库加入 `web` profile：
+
+```bash
+dsh plugin --profile web add github:hi-fangj/dsh-models-radar
+```
+
+也可以使用完整 Git URL：
+
+```bash
+dsh plugin --profile web add git+https://github.com/hi-fangj/dsh-models-radar.git
+```
+
+Git dependency 安装时会自动执行 package 的 `prepare` 生命周期：安装构建依赖并生成 `lib/index.js`、`lib/client.js`，然后 DSH 才加载插件。安装后刷新 `http://127.0.0.1:3080`；如果当前进程没有自动热加载新包，请重启一次 DSH。
+
+移除通过 Git 安装的插件：
+
+```bash
+dsh plugin --profile web remove dsh-models-radar
+```
+
+## 从本地源码安装
+
+需要开发或修改插件时，手动克隆并构建：
 
 ```bash
 git clone https://github.com/hi-fangj/dsh-models-radar.git
@@ -50,7 +72,7 @@ npm run build
 - `lib/index.js`：Host ESM bundle
 - `lib/client.js`：带 DSH `ModuleLoader` 握手的浏览器 CJS bundle
 
-### 使用 DSH CLI 安装（推荐）
+### 将本地 clone 加入 DSH
 
 构建完成后，将本地插件包加入 `web` profile：
 

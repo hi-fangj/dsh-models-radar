@@ -34,9 +34,31 @@ A model capability radar plugin for the [DeepSeek Harness](https://github.com/de
 - Node.js 22 or newer
 - npm
 
-## Install from Source
+## Install from Git
 
-Clone and build the plugin:
+The simplest installation fetches the repository directly into the `web` profile:
+
+```bash
+dsh plugin --profile web add github:hi-fangj/dsh-models-radar
+```
+
+The equivalent full Git URL is:
+
+```bash
+dsh plugin --profile web add git+https://github.com/hi-fangj/dsh-models-radar.git
+```
+
+Git dependency installation runs the package's `prepare` lifecycle, which installs the build dependency and generates `lib/index.js` and `lib/client.js` before DSH loads the plugin. Refresh `http://127.0.0.1:3080` after installation; restart DSH once if the running process does not hot-load the new package.
+
+To remove the Git-installed package:
+
+```bash
+dsh plugin --profile web remove dsh-models-radar
+```
+
+## Install from a Local Clone
+
+Clone and build the plugin manually when developing or modifying it:
 
 ```bash
 git clone https://github.com/hi-fangj/dsh-models-radar.git
@@ -50,7 +72,7 @@ The build produces:
 - `lib/index.js`: Host ESM bundle
 - `lib/client.js`: browser CJS bundle wrapped in the DSH `ModuleLoader` handshake
 
-### DSH CLI Installation (Recommended)
+### Add the Local Clone to DSH
 
 After building, add the local package to the `web` profile:
 
