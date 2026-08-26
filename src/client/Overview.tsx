@@ -75,9 +75,9 @@ export function TierOverview({ view, selectedKey, onSelect, t }: OverviewProps) 
         <div className="dsh_mr_bars">
         {groups.map((group, index) => {
           const isOpen = expanded.has(group.base)
-          const isSelected =
-            selectedKey !== null &&
-            (group.best.key === selectedKey || group.tiers.some((tier) => tier.key === selectedKey))
+          const isSelected = group.best.key === selectedKey
+          const hasSelectedChild =
+            selectedKey !== null && group.tiers.some((tier) => tier.key === selectedKey && tier.key !== group.best.key)
           const widthPct = iqProgress(group.best.iq) * 100
           const band = iqBand(group.best.iq)
           return (
@@ -85,7 +85,9 @@ export function TierOverview({ view, selectedKey, onSelect, t }: OverviewProps) 
               <div
                 className="dsh_mr_ovRow"
                 data-selected={isSelected}
+                data-group-selected={hasSelectedChild}
                 role="button"
+                aria-current={isSelected ? 'true' : undefined}
                 tabIndex={0}
                 onClick={() => onSelect(group.best.key)}
                 onKeyDown={(event) => {
@@ -125,6 +127,7 @@ export function TierOverview({ view, selectedKey, onSelect, t }: OverviewProps) 
                       className="dsh_mr_ovRow dsh_mr_ovChild"
                       data-selected={tier.key === selectedKey}
                       role="button"
+                      aria-current={tier.key === selectedKey ? 'true' : undefined}
                       tabIndex={0}
                       onClick={() => onSelect(tier.key)}
                       onKeyDown={(event) => {
