@@ -1,0 +1,12 @@
+{
+  "name": "dsh-models-radar",
+  "description": "Model capability radar Settings tab backed by the codexradar crowd benchmark",
+  "version": "0.1.0",
+  "entry": {
+    "name": "dsh-models-radar",
+    "inject": []
+  },
+  "client": {
+    "platform": "web"
+  }
+}
