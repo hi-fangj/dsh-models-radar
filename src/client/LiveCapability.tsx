@@ -336,6 +336,7 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
         <strong className="dsh_mr_liveIq">{displayedIq}</strong>
         <span className="dsh_mr_liveDelta" data-dir={direction}>{arrow} {deltaText}</span>
         <MiniTrend points={series} direction={direction} />
+        <span className="dsh_mr_liveChevron" aria-hidden="true">▸</span>
       </button>
       {popover}
     </>
