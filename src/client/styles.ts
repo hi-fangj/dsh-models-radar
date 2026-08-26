@@ -537,11 +537,8 @@ span.dsh_mr_ovChevron { cursor: default; }
 }
 .dsh_mr_liveReadout:hover { background: var(--dsw-alias-bg-layer-2); }
 .dsh_mr_liveReadout:active { background: var(--dsw-alias-bg-layer-3); }
+.dsh_mr_liveReadout:focus:not(:focus-visible) { outline: none; }
 .dsh_mr_liveReadout:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
-.dsh_mr_liveReadout[data-open="true"] {
-  border-color: var(--dsw-alias-brand-primary);
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, var(--dsw-alias-bg-layer-1));
-}
 .dsh_mr_liveChevron {
   display: inline-block;
   flex: none;
