@@ -17,7 +17,8 @@ import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { RadarPayload, RadarView } from '../contract.ts'
 import { fmt } from './locales.ts'
 import { TierOverview } from './Overview.tsx'
-import { TaskBars, DualTrendPanels } from './charts.tsx'
+import { TaskBars, TrendTabs } from './charts.tsx'
+import { CostScatterCard } from './costScatter.tsx'
 import { tierGroupsForView } from './harness.ts'
 import { iqBand } from './scoreMetrics.ts'
 import { moneyText, minutesText, pctText } from './format.ts'
@@ -245,7 +246,7 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
             </div>
             {matchHint !== null && <div className="dsh_mr_hint">{matchHint}</div>}
             {seriesPoints.length >= 2 ? (
-              <DualTrendPanels points={seriesPoints} t={t} />
+              <TrendTabs points={seriesPoints} t={t} />
             ) : (
               <div className="dsh_mr_empty">{t('empty.noSeries')}</div>
             )}
@@ -261,6 +262,8 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
               <div className="dsh_mr_empty">{t('empty.none')}</div>
             )}
           </div>
+
+          <CostScatterCard view={view} t={t} />
 
           <div className="dsh_mr_footer">
             <span

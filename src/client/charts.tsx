@@ -93,7 +93,8 @@ function buildSegments(values: number[], x: (index: number) => number, y: (value
 /**
  * One time-window trend panel: captioned chart with its own symmetric stats
  * row (net change / low / average / high over this window). Fewer than two
- * points renders the caption plus an empty-state text instead of a chart.
+ * points renders an empty-state text instead of a chart. The caption is
+ * omitted when a tab control already carries the window context.
  */
 export function TrendPanel({
   title,
@@ -101,7 +102,7 @@ export function TrendPanel({
   points,
   t,
 }: {
-  title: string
+  title?: string
   emptyText: string
   points: Array<[string, number]>
   t: Translate
@@ -141,7 +142,7 @@ export function TrendPanel({
     }
   }, [points])
 
-  const head = <div className="dsh_mr_trendPanelHead">{title}</div>
+  const head = title !== undefined ? <div className="dsh_mr_trendPanelHead">{title}</div> : null
   if (geometry === null || summary === null) {
     return (
       <section className="dsh_mr_trendPanel">
@@ -230,16 +231,51 @@ export function TrendPanel({
   )
 }
 
+const TREND_WINDOW_KEY = 'model-radar:trend-window'
+type TrendWindow = '24h' | '7d'
+
+function readTrendWindow(): TrendWindow {
+  try {
+    return localStorage.getItem(TREND_WINDOW_KEY) === '24h' ? '24h' : '7d'
+  } catch {
+    return '7d'
+  }
+}
+
 /**
- * The trend card body: near-24h and near-7d windows shown as separate stacked
- * panels over the same hourly series (time-sliced; some tiers carry sub-hourly
- * readings). Each panel scales its own y-axis and carries its own stats.
+ * The trend card body: near-24h and near-7d windows as tab-switched views of
+ * the same hourly series (time-sliced; some tiers carry sub-hourly readings).
+ * One window visible at a time — the page stays compact; the choice persists
+ * like the benchmark/tier selections. Each window scales its own y-axis and
+ * carries its own stats.
  */
-export function DualTrendPanels({ points, t }: { points: Array<[string, number]>; t: Translate }) {
+export function TrendTabs({ points, t }: { points: Array<[string, number]>; t: Translate }) {
+  const [win, setWin] = useState<TrendWindow>(readTrendWindow)
+  const select = (next: TrendWindow): void => {
+    try {
+      localStorage.setItem(TREND_WINDOW_KEY, next)
+    } catch {
+      // Persistence is best-effort; the tab still switches for this visit.
+    }
+    setWin(next)
+  }
+  const points24 = useMemo(() => sliceRecentPoints(points, 24), [points])
+
   return (
-    <div className="dsh_mr_trendStack">
-      <TrendPanel title={t('window.24h')} emptyText={t('empty.noRecent')} points={sliceRecentPoints(points, 24)} t={t} />
-      <TrendPanel title={t('window.7d')} emptyText={t('empty.noSeries')} points={points} t={t} />
+    <div className="dsh_mr_tabBody">
+      <div className="dsh_mr_seg" role="tablist" aria-label={t('line.title')}>
+        <button type="button" className="dsh_mr_segBtn" role="tab" aria-selected={win === '24h'} data-active={win === '24h'} onClick={() => select('24h')}>
+          {t('window.24h')}
+        </button>
+        <button type="button" className="dsh_mr_segBtn" role="tab" aria-selected={win === '7d'} data-active={win === '7d'} onClick={() => select('7d')}>
+          {t('window.7d')}
+        </button>
+      </div>
+      {win === '24h' ? (
+        <TrendPanel emptyText={t('empty.noRecent')} points={points24} t={t} />
+      ) : (
+        <TrendPanel emptyText={t('empty.noSeries')} points={points} t={t} />
+      )}
     </div>
   )
 }

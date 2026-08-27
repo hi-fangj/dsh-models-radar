@@ -536,18 +536,60 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_trendStat strong[data-dir="flat"] { color: var(--dsw-alias-label-secondary); }
 .dsh_mr_trendWrap { position: relative; min-width: 0; }
 .dsh_mr_trendWrap svg { display: block; width: 100%; height: auto; }
-/* Dual-window trend stack (near-24h above near-7d): one card, two
-   independently scaled panels separated by a dashed seam. */
-.dsh_mr_trendStack { display: flex; flex-direction: column; gap: 14px; }
-.dsh_mr_trendPanel + .dsh_mr_trendPanel {
-  border-top: 1px dashed var(--dsw-alias-border-l2);
-  padding-top: 12px;
-}
+/* Tab-switched card bodies (trend windows, cost metrics): the in-house
+   segmented control above a single active panel. */
+.dsh_mr_tabBody { display: flex; flex-direction: column; gap: 10px; }
+.dsh_mr_trendPanel { min-width: 0; }
 .dsh_mr_trendPanelHead {
   margin-bottom: 6px;
   font-size: 11.5px;
   font-weight: 600;
   color: var(--dsw-alias-label-secondary);
+}
+/* Cost × IQ scatter card: filter chip row + effort shape legend. */
+.dsh_mr_costChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.dsh_mr_costChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.dsh_mr_costChip[data-active='true'] {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-border-l1);
+}
+.dsh_mr_costChipDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.dsh_mr_costLegend {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10.5px;
+  color: var(--dsw-alias-label-secondary);
+}
+.dsh_mr_costLegend span { display: inline-flex; align-items: center; gap: 3px; }
+.dsh_mr_costLegend svg { width: 11px; height: 11px; overflow: visible; }
+.dsh_mr_costSymbol {
+  fill: var(--dsw-alias-bg-layer-1);
+  stroke: var(--dsw-alias-label-primary);
+  stroke-width: 1.6;
 }
 .dsh_mr_tip {
   position: absolute;

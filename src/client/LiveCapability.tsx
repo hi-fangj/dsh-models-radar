@@ -22,7 +22,7 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RadarPayload, RadarTier, RadarView } from '../contract.ts'
 import { bandColor, iqBand, trendSummary } from './scoreMetrics.ts'
 import { moneyText, minutesText, pctText } from './format.ts'
-import { TaskBars, DualTrendPanels } from './charts.tsx'
+import { TaskBars, TrendTabs } from './charts.tsx'
 import { TierOverview } from './Overview.tsx'
 import { tierGroupsForView } from './harness.ts'
 import { fmt } from './locales.ts'
@@ -296,7 +296,7 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
                   </select>
                 </div>
                 {detailSeries.length >= 2 ? (
-                  <DualTrendPanels points={detailSeries} t={t} />
+                  <TrendTabs points={detailSeries} t={t} />
                 ) : (
                   <div className="dsh_mr_empty">{t('empty.noSeries')}</div>
                 )}
