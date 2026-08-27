@@ -1,31 +1,63 @@
 # dsh-models-radar
 
-[中文文档](README.zh.md)
+<h1 align="center">dsh-models-radar · Model Capability Radar</h1>
 
-A model capability radar plugin for the [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) Web GUI. It reads public benchmark data from [deng.codexradar.com](https://deng.codexradar.com), adds a **Model Capability** page to Settings, and shows the selected session model's live DeepSWE score below the composer.
+<p align="center"><b>Crowd-benchmarked capability scores from deng.codexradar.com, inside the DeepSeek Harness: overview, trend, and cost on one screen.</b></p>
+
+<p align="center">
+  <a href="./README.zh.md">中文文档</a> ·
+  <a href="#usage">Usage</a> ·
+  <a href="#data-and-privacy">Data &amp; Privacy</a> ·
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/hi-fangj/dsh-models-radar/stargazers"><img src="https://img.shields.io/github/stars/hi-fangj/dsh-models-radar?style=flat-square" alt="GitHub stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A522-blue?style=flat-square" alt="Node.js ≥ 22">
+  <img src="https://img.shields.io/badge/DeepSeek%20Harness-plugin-4d6bfe?style=flat-square" alt="DSH plugin">
+</p>
+
+A model capability radar plugin for the [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) Web GUI. It reads public benchmark data from [deng.codexradar.com](https://deng.codexradar.com), adds a **Model Radar** page to Settings, and shows the selected session model's live DeepSWE score below the composer.
+
+## Screenshots
+
+**Settings · capability overview** — best-effort-per-base ranking with per-row Harness attribution (Codex / DSH / ZCode / Grok / Kimi Code); click any row to switch the charts below to that tier.
+
+![Settings · capability overview](docs/screenshots/settings-overview.png)
+
+**Capability popover** — opened from the composer readout: cross-base comparison plus the current tier's details, with a live "current" mark following the session model.
+
+![Capability popover](docs/screenshots/capability-popover.png)
+
+## Highlights
+
+- **Score attribution at a glance.** Every base-model row carries a Harness badge (Codex / DSH / ZCode / Grok / Kimi Code, site palette), and the tier selector options read `model · effort · harness`; unmatchable bases get no badge — never a guess.
+- **Best-effort-per-base ranking.** The capability overview groups by base model with a fixed `0–110` absolute-scale magnitude bar and a 24h trend signal per row; expand a row for the base's full reasoning-effort ladder.
+- **24h / 7d dual-window IQ trend.** Tab between two time windows, each independently scaled with its own full stats (net change, low, average, high); the curve is colored by capability band.
+- **Cost × IQ from three angles.** Tabs for composite cost (the site's own 2.5×-price-for-1.35×-speed trade-off, normalized per chart), time cost, and price cost; color = base, shape = reasoning effort, same-base tiers joined by ladder lines. Upper-left = more efficient.
+- **Live readout beside the composer.** Exact `model@reasoningEffort` matching through DSH's official per-session model directory, updating immediately on model switches; click it to open the capability popover for cross-base comparison.
+- **Lightweight, credential-free, offline-tolerant.** The browser never hits upstream directly (same-origin host proxy), freshness windows mean zero upstream requests inside a window, the latest local snapshot serves as fallback, and no credentials are requested or submitted.
 
 ## Features
 
-- **Settings → Model Capability** through the additive `settings.section` slot
-- **Capability overview** grouped by base model, with expandable reasoning-effort tiers
-- **Fixed IQ scale (`0–110`)** and consistent capability bands across channels
-- **Two benchmark channels**:
+- **Settings → Model Radar** page through the additive `settings.section` slot
+- **Capability overview** grouped by base model with expandable reasoning-effort tiers and per-row Harness attribution badges
+- Fixed `0–110` IQ scale with consistent capability-band semantics across channels
+- **Trend tabs**: last 24 hours / last 7 days, each independently y-scaled with full stats; the choice persists
+- **Cost × IQ card**: composite / time / price tabs on a log x-axis, model filter chips synced across tabs, codex-run DSV4 bases hidden by default (site parity)
+- Two benchmark channels:
   - `deep-swe`: code-repair tasks, binary-majority scoring
   - `pompeii-adjacency`: visual reconstruction tasks, continuous Adjacency F1
-- **Semantic task diagnostics**:
+- Semantic task diagnostics:
   - DeepSWE: passed / split vote / failed
   - Pompeii: low / general / good / excellent F1 bands
   - attention-first sorting and local filters
-- **Seven-day IQ trend** with a smooth curve, solid translucent area, 24-hour delta, and seven-day low/average/high
-- **Efficiency metrics**: IQ, average cost, average duration, cache hit rate, and 24-hour run count
-- **Composer capability readout** beside the session price pill:
-  - exact current `model@reasoningEffort` matching through DSH's official per-session model directory
-  - current DeepSWE IQ
-  - 24-hour delta
-  - 48-hour sparkline
-- **Refresh within freshness windows**: overview & per-task composition 15 min, channel list & IQ trend 60 min; only expired datasets are refetched, everything else is served from cache (single-flight, zero upstream hits inside a window)
-- **Manual refresh** button in the footer (skips the windows) next to the last-fetch timestamp
-- **Offline fallback** to the latest persisted snapshot when the upstream API is unavailable
+- Efficiency metric badges: IQ, average cost, average duration, cache hit rate, 24-hour run count
+- **Capability popover**: opened from the composer readout; cross-base comparison plus the viewed tier's full details (badges, dual-window trend, task composition)
+- Refresh within freshness windows: overview & per-task composition 15 min, channel list & IQ trend 60 min; only expired datasets are refetched, everything else is served from cache (single-flight, zero upstream hits inside a window)
+- Manual refresh button in the footer (skips the windows) next to the last-fetch timestamp
+- Offline fallback to the latest persisted snapshot when the upstream API is unavailable
 - Chinese and English UI copy
 
 ## Requirements
@@ -35,7 +67,9 @@ A model capability radar plugin for the [DeepSeek Harness](https://github.com/de
 - Node.js 22 or newer
 - npm
 
-## Install from Git
+## Install
+
+### From Git
 
 The simplest installation fetches the repository directly into the `web` profile:
 
@@ -43,7 +77,7 @@ The simplest installation fetches the repository directly into the `web` profile
 dsh plugin --profile web add github:hi-fangj/dsh-models-radar
 ```
 
-The equivalent full Git URL is:
+The equivalent full Git URL:
 
 ```bash
 dsh plugin --profile web add git+https://github.com/hi-fangj/dsh-models-radar.git
@@ -57,9 +91,9 @@ To remove the Git-installed package:
 dsh plugin --profile web remove dsh-models-radar
 ```
 
-## Install from a Local Clone
+### From a local clone
 
-Clone and build the plugin manually when developing or modifying it:
+To develop or modify the plugin, clone and build manually:
 
 ```bash
 git clone https://github.com/hi-fangj/dsh-models-radar.git
@@ -68,12 +102,10 @@ npm ci
 npm run build
 ```
 
-The build produces:
+Build artifacts:
 
 - `lib/index.js`: Host ESM bundle
-- `lib/client.js`: browser CJS bundle wrapped in the DSH `ModuleLoader` handshake
-
-### Add the Local Clone to DSH
+- `lib/client.js`: browser CJS bundle with the DSH `ModuleLoader` handshake
 
 After building, add the local package to the `web` profile:
 
@@ -81,21 +113,21 @@ After building, add the local package to the `web` profile:
 dsh plugin --profile web add /absolute/path/to/dsh-models-radar
 ```
 
-`dsh plugin` delegates dependency installation to the selected profile, so this command installs the package into `~/.dsh/profiles/web`. The repository includes built bundles for direct Git installation; after making local source changes, run `npm run build` before adding or reloading the local clone.
+`dsh plugin` delegates dependency installation to the named profile, so the package lands in `~/.dsh/profiles/web`. The repository ships build artifacts for Git-based installs; after changing local sources, run `npm run build` before adding or reloading the local clone.
 
-Refresh `http://127.0.0.1:3080` after installation. If the currently running DSH process does not hot-load the newly added package, restart DSH once and refresh the page.
+Refresh `http://127.0.0.1:3080` after installation. If the running DSH process does not hot-load the new package, restart DSH once and refresh again.
 
-To remove this CLI-installed dependency:
+To remove a CLI-installed dependency:
 
 ```bash
 dsh plugin --profile web remove dsh-models-radar
 ```
 
-Restart DSH after removal so the profile is recomposed without the plugin.
+Restart DSH afterwards so the profile reassembles without the plugin.
 
-### Runtime Injection
+### Runtime injection and persistent install
 
-Runtime injection is the fastest way to try the plugin. In a DSH session, ask the Agent to call:
+Runtime injection suits quick trials. Ask the Agent in a DSH session to call:
 
 ```text
 dev_inject_plugin({
@@ -103,11 +135,9 @@ dev_inject_plugin({
 })
 ```
 
-Then refresh `http://127.0.0.1:3080` once. Runtime injection remains active until the DSH process restarts or the plugin is uninjected.
+Then refresh `http://127.0.0.1:3080` once. Injection lasts until the DSH process restarts or the plugin is unloaded explicitly.
 
-### Persistent Installation
-
-To add the package to the `web` profile's dependencies and bundle list, ask the Agent to call:
+To write the dependency and bundle list into the `web` profile, ask the Agent to call:
 
 ```text
 dev_install_package({
@@ -116,50 +146,62 @@ dev_install_package({
 })
 ```
 
-Refresh the Web GUI after installation. The package will be assembled again from the profile after a DSH restart.
+Refresh the Web GUI afterwards. DSH re-assembles the plugin from the profile on restart.
 
 ## Usage
 
-### Capability Page
+### The Model Radar page
 
-1. Open **Settings** in the lower-left corner of the DSH Web GUI.
-2. Select **Model Capability**.
-3. Choose `DeepSWE` or `Pompeii` at the top.
-4. Select a model tier from the overview or tier selector.
+1. Open **Settings** from the bottom-left of the DSH Web GUI.
+2. Choose **Model Radar**.
+3. Pick the `DeepSWE` or `Pompeii` channel at the top.
+4. Select a model tier from the capability overview or the tier selector.
 
-The page refreshes on open within the freshness windows: data served from cache costs no upstream request, and only expired datasets are refetched. Clicking a row in the overview changes the model tier used by the metrics, trend, and task diagnostics below it.
+Every page activation refreshes within the freshness windows: cached data costs no upstream requests and only expired datasets are refetched. Clicking any overview row switches the tier used by the efficiency badges, trend, and task diagnostics below.
 
-### Capability Overview
+### Capability overview
 
-Each base model is represented by its strongest tier. Expand a row to inspect all available reasoning-effort tiers. IQ bars use an absolute `0–110` scale:
+Each base model shows its currently strongest tier by default; expanding a row reveals the full reasoning-effort ladder. The IQ progress bar uses a fixed `0–110` absolute scale:
 
-| IQ | Band |
+| IQ | Capability band |
 | --- | --- |
-| `< 70` | Needs improvement |
+| `< 70` | Developing |
 | `70–84.9` | General |
 | `85–94.9` | Steady |
 | `95–99.9` | Excellent |
-| `≥ 100` | Leading |
+| `≥ 100` | Leader |
 
-### Task Diagnostics
+### IQ trend
 
-DeepSWE uses the benchmark's real majority-vote result. Pompeii keeps its continuous F1 semantics. Filters and counts are computed locally; no extra API request is made when changing filters.
+The last-24h and last-7d tabs are time-sliced views of the same hourly series, each with its own y-axis scaling and full stats (net change, low, average, high). The curve is colored by capability band with a matching translucent area fill; endpoint and hover markers use the band color.
 
-### Composer Readout
+### Cost × IQ comparison
 
-The compact pill below the composer follows the model selected for the session's **next request**, not merely the most recently completed response. It displays:
+Three tabs (composite / time / price) plot every tier on a log cost axis × linear IQ axis: color = base model (site palette), shape = reasoning effort (off=× · low=○ · medium=△ · high=□ · xhigh=◇ · max=⬡ · ultra=★), same-base tiers joined by ladder lines in effort order. **Upper-left = more efficient.** The model chip row multi-selects, synced across the active tab; the codex-run DSV4 bases are hidden by default, matching the site.
+
+### Task diagnostics
+
+DeepSWE uses the upstream's real majority-vote verdicts; Pompeii keeps continuous F1 semantics. Filtering, counting, and sorting all happen locally in the browser — switching filters adds no API requests.
+
+### Capability popover
+
+Click the capability capsule below the composer to open the popover: a full base overview (for comparison) on top and the viewed tier's details below (efficiency badges, dual-window trend, task composition). The viewed tier follows the session model by default; clicking an overview row or using the trend card's tier selector views another tier temporarily until the session model changes or the popover closes.
+
+### The composer capability capsule
+
+The compact capsule reads the model selected for the session's **next request**, not a guess from the last completed reply. Display:
 
 ```text
-SWE IQ 90.2   ↑ +1.4   [48h sparkline]
+SWE IQ 90.2   ↑ +1.4
 ```
 
-Matching behavior:
+Match order:
 
 1. Exact `model@reasoningEffort` match
-2. Best tier of the same base model, prefixed with `≈`
-3. Hidden when the base model does not exist in the DeepSWE leaderboard
+2. The same base model's highest-IQ tier, prefixed with `≈`
+3. Hidden entirely when the base is absent from the DeepSWE leaderboard
 
-The readout updates immediately when the composer model changes. The readout polls the host every 15 minutes (the shortest freshness window), so each tick costs one local request and an upstream fetch at most once per window per channel; a failed refresh keeps the last successful value.
+Switching models in the composer updates the capsule immediately. The readout polls the host every 15 minutes (the shortest freshness window) — one local request per tick and at most one upstream fetch per channel per window; on failure the last successful value is kept.
 
 ## Update
 
@@ -170,7 +212,7 @@ npm ci
 npm run build
 ```
 
-For a runtime-injected package, ask the Agent to reload it:
+For runtime-injected plugins, ask the Agent to hot-reload:
 
 ```text
 dev_reload_package({
@@ -182,7 +224,7 @@ Refresh the page if the client dependency graph changed.
 
 ## Uninstall
 
-For a runtime-injected package:
+Unload a runtime-injected plugin:
 
 ```text
 dev_uninject_plugin({
@@ -190,27 +232,27 @@ dev_uninject_plugin({
 })
 ```
 
-For a persistent profile installation, remove `dsh-models-radar` through your profile/plugin manager and restart DSH. Snapshot data is intentionally retained under `~/.dsh/plugin-data/dsh-models-radar/`; remove that directory separately only when its history is no longer needed.
+For persistently installed plugins, remove `dsh-models-radar` through the profile / plugin manager, then restart DSH. Snapshot history stays in `~/.dsh/plugin-data/dsh-models-radar/`; delete that directory separately only if you no longer want the history.
 
-## Data and Privacy
+## Data and privacy
 
-The plugin reads unauthenticated public endpoints from `https://api.codexradar.com/api/v1`:
+The plugin reads public, unauthenticated endpoints of `https://api.codexradar.com/api/v1`:
 
 - `/benchmarks`
 - `/intelligence-efficiency`
 - `/iq-history`
 - `/leaderboard`
 
-The browser does not contact the upstream API directly. `api.codexradar.com` only allows selected browser origins through CORS, so the Host half proxies the request through the same-origin endpoint `/model-radar/api/data`. See [ADR-0001](docs/adr/0001-host-proxy-fetch.md).
+The browser never calls the upstream API directly. Because `api.codexradar.com` allowlists browser origins, the host half proxies requests through the same-origin route `/model-radar/api/data`. See [ADR-0001](docs/adr/0001-host-proxy-fetch.md) for the rationale.
 
-The plugin:
+This plugin:
 
-- does not request credentials or tokens
-- does not submit benchmark results
-- does not send conversation content
+- never requests passwords, tokens, or other credentials
+- never submits benchmark results
+- never sends session content
 - stores only public benchmark snapshots locally
 
-Snapshot files:
+Snapshot directory:
 
 ```text
 ~/.dsh/plugin-data/dsh-models-radar/
@@ -223,19 +265,19 @@ Snapshot files:
 
 ```text
 Browser
-  ├── settings.section → Model Capability page
-  ├── conversation.composer.dock → live session capability pill
+  ├── settings.section → Model Radar page
+  ├── conversation.composer.dock → session capability capsule + popover
   └── GET /model-radar/api/data
             │
             ▼
 Host plugin
-  ├── per-dataset freshness windows (15 min efficiency/leaderboard, 60 min benchmarks/history)
-  ├── single-flight upstream fetches + channel-global benchmarks cache
-  ├── RadarView normalization
-  └── local snapshot persistence (snapshots keep serving within their window after a restart)
+  ├── per-dataset freshness windows (efficiency/tasks 15 min, channels/trend 60 min)
+  ├── single-flight upstream requests + channel-global benchmarks cache
+  ├── normalization into RadarView
+  └── local snapshot persistence (served within its window across restarts)
 ```
 
-The composer readout subscribes to DSH's official `modelDirectories` per-session store, so model changes propagate without polling the model-selection state.
+The capability capsule subscribes to DSH's official `modelDirectories` per-session store, so model switches propagate without polling.
 
 ## Development
 
@@ -244,7 +286,7 @@ npm ci
 npm run build
 ```
 
-Useful DSH development operations:
+Common DSH development operations:
 
 ```text
 dev_inject_plugin({ "dir": "/absolute/path/to/dsh-models-radar" })
@@ -252,34 +294,44 @@ dev_reload_package({ "packageName": "dsh-models-radar" })
 dev_uninject_plugin({ "match": "dsh-models-radar" })
 ```
 
-Primary source files:
+Main sources:
 
-- `src/index.ts`: Host proxy, refresh throttle, and snapshots
-- `src/client/RadarSection.tsx`: Settings page state and composition
+- `src/index.ts`: host proxy, refresh throttling, snapshots
+- `src/client/RadarSection.tsx`: settings-page state and composition
 - `src/client/Overview.tsx`: capability overview
-- `src/client/charts.tsx`: trend and task diagnostics
-- `src/client/LiveCapability.tsx`: composer capability readout
-- `src/client/ScrollFrame.tsx`: persistent overflow scrollbar
+- `src/client/charts.tsx`: trend charts and task diagnostics
+- `src/client/costScatter.tsx`: cost × IQ comparison scatter
+- `src/client/harness.ts`: harness attribution and tier-selector labels
+- `src/client/LiveCapability.tsx`: composer readout and popover
+- `src/client/ScrollFrame.tsx`: scrollbar for overflowing lists
 - `src/client/scoreMetrics.ts`: IQ bands and trend semantics
-- `CONTEXT.md`: project domain language
+- `CONTEXT.md`: the project's domain vocabulary
+
+## Docs
+
+| Doc | Contents |
+| --- | --- |
+| [ADR-0001](docs/adr/0001-host-proxy-fetch.md) | Why the browser never hits upstream directly (host proxy) |
+| [ADR-0002](docs/adr/0002-freshness-window.md) | Per-dataset freshness-window refresh throttling |
+| [CONTEXT.md](CONTEXT.md) | Domain glossary (model tier, harness, trend, …) |
 
 ## Troubleshooting
 
-### The Model Capability tab is missing
+### No Model Radar tab in Settings
 
-1. Confirm `npm run build` produced `lib/client.js`.
-2. Confirm the plugin is active with `dev_plugin_status`.
-3. Refresh the Web GUI once to load the latest client graph.
+1. Make sure `npm run build` produced `lib/client.js`.
+2. Use `dev_plugin_status` to confirm the plugin is active.
+3. Refresh the Web GUI once to load the latest client dependency graph.
 
-### The composer capability pill is missing
+### No capability capsule below the composer
 
-- Confirm the selected model exists in the DeepSWE leaderboard.
-- A base-model fallback is shown with `≈`; an entirely unknown base model is hidden by design.
-- Confirm the official model-selection UI plugin is active.
+- Make sure the current model exists on the DeepSWE leaderboard.
+- Same-base fallback shows `≈`; a fully unknown base is hidden by design.
+- Make sure the official model-selection UI plugin is enabled.
 
-### Upstream refresh failed
+### Upstream refresh failures
 
-The Settings page shows the latest stored snapshot when one exists. Check network access to `api.codexradar.com`; no credential is required.
+With snapshot history present, the settings page shows the last successful data. Check network reachability of `api.codexradar.com`; the API needs no credentials.
 
 ## License
 

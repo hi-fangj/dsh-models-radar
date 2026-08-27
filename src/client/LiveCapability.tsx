@@ -24,7 +24,7 @@ import { bandColor, iqBand, trendSummary } from './scoreMetrics.ts'
 import { moneyText, minutesText, pctText } from './format.ts'
 import { TaskBars, TrendTabs } from './charts.tsx'
 import { TierOverview } from './Overview.tsx'
-import { tierGroupsForView } from './harness.ts'
+import { tierOptionLabel } from './harness.ts'
 import { fmt } from './locales.ts'
 
 /** Dock polling period: matches the host's shortest freshness window (15 min, host-side FRESH_EFFICIENCY_MS). */
@@ -193,7 +193,10 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
   // Grouped options for the trend card's tier selector (settings-page format).
   // MUST stay above the early-return guard below: hooks run unconditionally,
   // or React's render-count invariant kills the whole dock subtree.
-  const tierGroups = useMemo(() => tierGroupsForView(view?.tiers ?? []), [view])
+  const tierOptions = useMemo(
+    () => (view === null ? [] : view.tiers.map((candidate) => ({ key: candidate.key, label: tierOptionLabel(candidate) }))),
+    [view],
+  )
 
   if (view === null || selection === null || match === null) return null
 
@@ -273,8 +276,8 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
               <div className="dsh_mr_card">
                 <div className="dsh_mr_cardHead">
                   <span className="dsh_mr_cardTitle">{t('line.title')}</span>
-                  {/* Same grouped tier selector as the settings trend card
-                      (base+harness optgroups, effort · IQ options). Picking a
+                  {/* Same flat tier selector as the settings trend card
+                      (model · harness · effort options, no score). Picking a
                       tier is temporary viewing — identical to clicking an
                       overview row: it resets to following the session match
                       when the match moves or the popover closes. */}
@@ -284,14 +287,10 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
                     onChange={(event) => setViewTierKey(event.target.value)}
                     aria-label={t('line.title')}
                   >
-                    {tierGroups.map((group) => (
-                      <optgroup key={group.base} label={group.label}>
-                        {group.tiers.map((candidate) => (
-                          <option key={candidate.key} value={candidate.key}>
-                            {candidate.effort} · IQ {candidate.iq.toFixed(1)}
-                          </option>
-                        ))}
-                      </optgroup>
+                    {tierOptions.map((candidate) => (
+                      <option key={candidate.key} value={candidate.key}>
+                        {candidate.label}
+                      </option>
                     ))}
                   </select>
                 </div>

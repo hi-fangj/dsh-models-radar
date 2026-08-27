@@ -547,6 +547,13 @@ span.dsh_mr_ovChevron { cursor: default; }
   color: var(--dsw-alias-label-secondary);
 }
 /* Cost × IQ scatter card: filter chip row + effort shape legend. */
+.dsh_mr_costTitleGroup {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
 .dsh_mr_costChips {
   display: flex;
   flex-wrap: wrap;

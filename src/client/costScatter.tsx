@@ -331,7 +331,10 @@ export function CostScatterCard({ view, t }: { view: RadarView; t: (key: ModelRa
   return (
     <div className="dsh_mr_card">
       <div className="dsh_mr_cardHead">
-        <span className="dsh_mr_cardTitle">{t('cost.title')}</span>
+        <div className="dsh_mr_costTitleGroup">
+          <span className="dsh_mr_cardTitle">{t('cost.title')}</span>
+          <span className="dsh_mr_hint">{t('cost.hint')}</span>
+        </div>
         <span className="dsh_mr_costLegend">
           {EFFORT_ORDER.map((effort) => (
             <span key={effort}>

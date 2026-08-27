@@ -1,14 +1,51 @@
 # dsh-models-radar
 
-[English documentation](README.md)
+<h1 align="center">dsh-models-radar · 模型能力雷达</h1>
 
-面向 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) Web GUI 的模型能力雷达插件。插件读取 [deng.codexradar.com](https://deng.codexradar.com) 的公开众测数据，在设置页增加「模型能力」页面，并在输入框下方显示当前 session 所选模型的 DeepSWE 实时能力读数。
+<p align="center"><b>把 deng.codexradar.com 的众测能力分装进 DeepSeek Harness：总览、趋势、成本，一屏读完。</b></p>
+
+<p align="center">
+  <a href="./README.md">English</a> ·
+  <a href="#使用方法">使用方法</a> ·
+  <a href="#数据与隐私">数据与隐私</a> ·
+  <a href="#故障排查">故障排查</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/hi-fangj/dsh-models-radar/stargazers"><img src="https://img.shields.io/github/stars/hi-fangj/dsh-models-radar?style=flat-square" alt="GitHub stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A522-blue?style=flat-square" alt="Node.js ≥ 22">
+  <img src="https://img.shields.io/badge/DeepSeek%20Harness-plugin-4d6bfe?style=flat-square" alt="DSH plugin">
+</p>
+
+面向 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) Web GUI 的模型能力雷达插件。插件读取 [deng.codexradar.com](https://deng.codexradar.com) 的公开众测数据，在设置页增加「模型雷达」页面，并在输入框下方显示当前 session 所选模型的 DeepSWE 实时能力读数。
+
+## 截图预览
+
+**设置页 · 能力总览** — 每基座最强档排行，行内标注分数出处 Harness（Codex / DSH / ZCode / Grok / Kimi Code），点击任意行切换下方图表的档位。
+
+![设置页 · 能力总览](docs/screenshots/settings-overview.png)
+
+**能力浮层** — 点击输入框旁的能力读数展开：跨基座对比选型 + 当前档位详情，「当前」标记实时跟随会话模型。
+
+![能力浮层](docs/screenshots/capability-popover.png)
+
+## 亮点
+
+- **分数出处一眼可辨。** 每个基座行内都带 Harness 徽章（Codex / DSH / ZCode / Grok / Kimi Code，站点同款配色），档位选择器的选项同样写全「模型 · 力度 · Harness」；识别不了的基座不打标，绝不猜测。
+- **每基座最强档排行。** 能力总览按基座聚合，行内嵌固定 `0–110` 绝对刻度的量级条与 24h 趋势信号，展开可查看该基座全部推理力度档位。
+- **24h / 7d 双窗 IQ 趋势。** 页签切换两个时间窗，各自独立缩放与统计（区间变化、最低、平均、最高）；曲线按能力等级分段着色。
+- **成本 × IQ 三视角对比。** 综合成本（站点同款「2.5 倍价格可换 1.35 倍速度」折算公式，图内归一化）、时间成本、费用成本页签切换；颜色＝基座、形状＝推理力度，同基座档位以折线相连，越靠左上越高效。
+- **输入框旁实时读数。** 通过 DSH 官方 per-session 模型目录精确匹配 `model@reasoningEffort`，会话切换模型立即更新；点击展开能力浮层做跨基座对比选型。
+- **轻量、零凭据、可离线。** 浏览器不直连上游（Host 同源代理），按类别新鲜窗口刷新、窗口内零上游请求；上游不可用时自动回退本地快照；不请求任何凭据、不提交任何数据。
 
 ## 功能
 
-- 通过 `settings.section` 扩展点增加 **设置 → 模型能力** 页面
-- 按基座模型聚合的**能力总览**，可展开查看所有推理力度档位
+- 通过 `settings.section` 扩展点增加 **设置 → 模型雷达** 页面
+- **能力总览**：按基座模型聚合，可展开查看所有推理力度档位，行内 Harness 徽章标注分数出处
 - 使用固定 `0–110` IQ 刻度，跨频道保持一致的能力等级语义
+- **IQ 趋势页签**：近 24 小时 / 近 7 天切换，各窗独立 y 轴缩放与完整统计，选择被记住
+- **成本 × IQ 对比卡**：综合 / 时间 / 费用三个页签，对数横轴，模型 chip 行多选筛选，Codex 跑的 DSV4 两档默认隐藏（与站点一致）
 - 支持两个评测频道：
   - `deep-swe`：代码修复任务，binary-majority 多数票评分
   - `pompeii-adjacency`：视觉恢复任务，连续 Adjacency F1 评分
@@ -16,13 +53,8 @@
   - DeepSWE：通过 / 投票分歧 / 失败
   - Pompeii：较低 / 一般 / 良好 / 优秀
   - 待关注任务优先排序与本地筛选
-- 七天 IQ 趋势：平滑曲线、低透明度实色面积、24h 变化、七天最低/平均/最高
-- 效率指标：IQ、平均费用、平均耗时、缓存命中率、24h 运行数
-- 在会话价格胶囊旁显示**当前 session 能力读数**：
-  - 通过 DSH 官方 per-session 模型目录精确匹配 `model@reasoningEffort`
-  - 当前 DeepSWE IQ
-  - 24h 变化
-  - 48h 微型趋势图
+- 效率指标徽章：IQ、平均费用、平均耗时、缓存命中率、24h 运行数
+- **能力浮层**：从输入框旁读数展开，总览对比选型 + 查看档位完整详情（徽章、双窗趋势、任务构成）
 - 按类别新鲜窗口刷新：总览/任务构成 15 分钟、频道列表与趋势 60 分钟；只重拉过期数据，窗口内零上游请求（单飞行合并）
 - 页脚常驻**手动刷新**按钮（绕行窗口），旁边显示最近拉取时间
 - 上游不可用时自动使用最近一次本地快照
@@ -35,7 +67,9 @@
 - Node.js 22 或更高版本
 - npm
 
-## 从 Git 直接安装
+## 安装
+
+### 从 Git 直接安装
 
 最简单的安装方式是直接将 GitHub 仓库加入 `web` profile：
 
@@ -57,7 +91,7 @@ dsh plugin --profile web add git+https://github.com/hi-fangj/dsh-models-radar.gi
 dsh plugin --profile web remove dsh-models-radar
 ```
 
-## 从本地源码安装
+### 从本地源码安装
 
 需要开发或修改插件时，手动克隆并构建：
 
@@ -72,8 +106,6 @@ npm run build
 
 - `lib/index.js`：Host ESM bundle
 - `lib/client.js`：带 DSH `ModuleLoader` 握手的浏览器 CJS bundle
-
-### 将本地 clone 加入 DSH
 
 构建完成后，将本地插件包加入 `web` profile：
 
@@ -93,7 +125,7 @@ dsh plugin --profile web remove dsh-models-radar
 
 移除后重启 DSH，使 profile 在不包含该插件的情况下重新装配。
 
-### 运行时注入
+### 运行时注入与持久安装
 
 运行时注入适合快速试用。在 DSH 会话中让 Agent 调用：
 
@@ -104,8 +136,6 @@ dev_inject_plugin({
 ```
 
 随后刷新一次 `http://127.0.0.1:3080`。运行时注入会保持到 DSH 进程重启，或主动卸载插件为止。
-
-### 持久安装
 
 如需写入 `web` profile 的依赖和 bundle 列表，让 Agent 调用：
 
@@ -120,11 +150,11 @@ dev_install_package({
 
 ## 使用方法
 
-### 模型能力页面
+### 模型雷达页面
 
 1. 打开 DSH Web GUI 左下角的**设置**。
-2. 选择**模型能力**。
-3. 在页面顶部选择 `DeepSWE` 或 `Pompeii`。
+2. 选择**模型雷达**。
+3. 在页面顶部选择 `DeepSWE` 或 `庞贝壁画` 频道。
 4. 从能力总览或档位选择器中选择模型档位。
 
 页面每次打开都会在新鲜窗口内刷新：缓存中的数据不发上游请求，仅过期数据集被重拉。点击总览中的任意行，会同步切换下方效率指标、趋势图和任务诊断所使用的档位。
@@ -141,16 +171,28 @@ dev_install_package({
 | `95–99.9` | 优秀 |
 | `≥ 100` | 领先 |
 
+### IQ 趋势
+
+近 24 小时与近 7 天两个页签来自同一份小时级序列的时间窗切片，各窗独立缩放 y 轴，各带一组完整统计（区间变化、最低、平均、最高）。曲线按能力等级分段着色，面积填充与曲线同色；端点与悬停标记使用所在等级的颜色。
+
+### 成本 × IQ 对比
+
+三个页签（综合成本 / 时间成本 / 费用成本）分别以对数成本轴 × 线性 IQ 轴绘制全部档位：颜色＝基座（站点同款配色）、形状＝推理力度（off=× · low=○ · medium=△ · high=□ · xhigh=◇ · max=⬡ · ultra=★），同基座档位按力度顺序以折线相连。**越靠左上越高效。** 模型 chip 行可多选筛选，同步作用于当前页签；Codex 跑的 DSV4 两档默认隐藏，与站点行为一致。
+
 ### 任务诊断
 
 DeepSWE 使用上游真实的多数票判定；Pompeii 保留连续 F1 语义。筛选、计数和排序全部在浏览器本地完成，切换筛选不会增加 API 请求。
+
+### 能力浮层
+
+点击输入框下方的能力胶囊展开浮层：顶部为全基座能力总览（供对比选型），其下为查看档位的完整详情（效率徽章、双窗 IQ 趋势、任务构成）。查看档位默认跟随会话模型；点击总览行或切换趋势卡档位下拉可临时查看其他档位，会话切换模型或浮层关闭后回到跟随。
 
 ### 输入框下方能力胶囊
 
 紧凑能力胶囊读取的是当前 session **下一次请求**选中的模型，而不是仅根据最近一次已完成回复推测。显示形式：
 
 ```text
-SWE IQ 90.2   ↑ +1.4   [48h 微型趋势]
+SWE IQ 90.2   ↑ +1.4
 ```
 
 匹配顺序：
@@ -223,8 +265,8 @@ dev_uninject_plugin({
 
 ```text
 Browser
-  ├── settings.section → 模型能力页面
-  ├── conversation.composer.dock → 当前 session 能力胶囊
+  ├── settings.section → 模型雷达页面
+  ├── conversation.composer.dock → 当前 session 能力胶囊 + 能力浮层
   └── GET /model-radar/api/data
             │
             ▼
@@ -258,14 +300,24 @@ dev_uninject_plugin({ "match": "dsh-models-radar" })
 - `src/client/RadarSection.tsx`：设置页状态与界面组合
 - `src/client/Overview.tsx`：能力总览
 - `src/client/charts.tsx`：趋势图和任务诊断
-- `src/client/LiveCapability.tsx`：输入框下方实时能力读数
+- `src/client/costScatter.tsx`：成本 × IQ 对比散点
+- `src/client/harness.ts`：Harness 归属推导与档位选择器文案
+- `src/client/LiveCapability.tsx`：输入框下方实时能力读数与浮层
 - `src/client/ScrollFrame.tsx`：溢出列表滚动条
 - `src/client/scoreMetrics.ts`：IQ 等级和趋势语义
 - `CONTEXT.md`：项目领域词汇
 
+## 文档
+
+| 文档 | 内容 |
+| --- | --- |
+| [ADR-0001](docs/adr/0001-host-proxy-fetch.md) | 为什么浏览器不直连上游、由 Host 同源代理 |
+| [ADR-0002](docs/adr/0002-freshness-window.md) | 按类别新鲜窗口的刷新节流设计 |
+| [CONTEXT.md](CONTEXT.md) | 项目领域词汇表（模型档位、Harness、趋势等） |
+
 ## 故障排查
 
-### 设置页没有「模型能力」tab
+### 设置页没有「模型雷达」tab
 
 1. 确认 `npm run build` 已生成 `lib/client.js`。
 2. 使用 `dev_plugin_status` 确认插件处于 active 状态。

@@ -19,7 +19,7 @@ import { fmt } from './locales.ts'
 import { TierOverview } from './Overview.tsx'
 import { TaskBars, TrendTabs } from './charts.tsx'
 import { CostScatterCard } from './costScatter.tsx'
-import { tierGroupsForView } from './harness.ts'
+import { tierOptionLabel } from './harness.ts'
 import { iqBand } from './scoreMetrics.ts'
 import { moneyText, minutesText, pctText } from './format.ts'
 
@@ -139,9 +139,6 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
   const channels = view !== null && view.channels.length > 0 ? view.channels : FALLBACK_CHANNELS
   const taskRows = tierKey !== null ? (view?.taskRates[tierKey] ?? []) : []
   const seriesPoints = tierKey !== null ? (view?.series[tierKey] ?? []) : []
-  // Trend-card tier dropdown: the overview's base→effort grouping with the
-  // base's harness in each group label (see tierGroupsForView).
-  const tierGroups = useMemo(() => (view === null ? [] : tierGroupsForView(view.tiers)), [view])
 
   const badges: Array<{ label: string; value: string; accent?: boolean; band?: string }> = [
     {
@@ -233,14 +230,10 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
                 aria-label={t('line.title')}
               >
                 {tierKey === null && <option value="">—</option>}
-                {tierGroups.map((group) => (
-                  <optgroup key={group.base} label={group.label}>
-                    {group.tiers.map((candidate) => (
-                      <option key={candidate.key} value={candidate.key}>
-                        {candidate.effort} · IQ {candidate.iq.toFixed(1)}
-                      </option>
-                    ))}
-                  </optgroup>
+                {view.tiers.map((candidate) => (
+                  <option key={candidate.key} value={candidate.key}>
+                    {tierOptionLabel(candidate)}
+                  </option>
                 ))}
               </select>
             </div>

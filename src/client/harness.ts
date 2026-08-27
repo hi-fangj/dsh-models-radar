@@ -46,44 +46,13 @@ export function harnessOfModel(model: string): HarnessId | null {
   return null
 }
 
-/** One tier-dropdown optgroup: a base model's ladder under an attributed label. */
-export interface TierGroup {
-  base: string
-  /** Group heading: base id plus its harness name when attributable. */
-  label: string
-  tiers: Array<{ key: string; effort: string; iq: number }>
-}
-
 /**
- * The overview's base→effort grouping in dropdown form: one group per base,
- * ordered by that base's best tier (the global IQ sort yields this), each
- * option carrying effort + IQ only since the group heading owns the base name.
- * Shared by the settings page and the capability popover so the two trend
- * cards present identical selector formats.
+ * Full-attribution label for a tier selector option: model · effort · harness.
+ * No score — the charts next to the selector carry it. Unmatchable harness
+ * simply drops the last segment. Shared by the settings page and the
+ * capability popover so both selectors read identically, open or collapsed.
  */
-export function tierGroupsForView(tiers: RadarTierInput[]): TierGroup[] {
-  const byBase = new Map<string, RadarTierInput[]>()
-  for (const tier of tiers) {
-    const ladder = byBase.get(tier.model)
-    if (ladder === undefined) byBase.set(tier.model, [tier])
-    else ladder.push(tier)
-  }
-  const groups: TierGroup[] = []
-  for (const [base, ladder] of byBase) {
-    const harness = harnessOfModel(base)
-    groups.push({
-      base,
-      label: harness === null ? base : `${base} · ${harnessMeta(harness).label}`,
-      tiers: ladder.map(({ key, effort, iq }) => ({ key, effort, iq })),
-    })
-  }
-  return groups
-}
-
-/** Minimal structural face of a contract tier — keeps this module UI-only. */
-interface RadarTierInput {
-  model: string
-  key: string
-  effort: string
-  iq: number
+export function tierOptionLabel(tier: { model: string; effort: string }): string {
+  const harness = harnessOfModel(tier.model)
+  return harness === null ? `${tier.model} · ${tier.effort}` : `${tier.model} · ${tier.effort} · ${harnessMeta(harness).label}`
 }
