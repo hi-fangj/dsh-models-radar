@@ -286,6 +286,14 @@ npm ci
 npm run build
 ```
 
+GitHub Actions runs a build check on every push/PR; pushing a `v*` tag automatically builds, packs, and publishes a GitHub Release with the tgz attached. The release flow:
+
+```bash
+# after bumping the version in package.json and committing:
+git tag v0.1.x
+git push origin main --tags
+```
+
 Common DSH development operations:
 
 ```text

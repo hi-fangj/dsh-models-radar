@@ -1,0 +1,21 @@
+# Build verification on every push to main and every pull request.
+# The repo commits lib/ artifacts (Git-direct installs never build), so this
+# job's role is regression cover: sources must always compile cleanly.
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build

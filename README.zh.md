@@ -286,6 +286,14 @@ npm ci
 npm run build
 ```
 
+GitHub Actions 在每次 push/PR 时做构建验证；推送 `v*` tag 则自动构建、打包并发布带 tgz 附件的 GitHub Release。发版流程：
+
+```bash
+# 修改 package.json 版本并提交后：
+git tag v0.1.x
+git push origin main --tags
+```
+
 常用 DSH 开发操作：
 
 ```text
