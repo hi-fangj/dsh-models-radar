@@ -308,6 +308,29 @@ span.dsh_mr_ovChevron { cursor: default; }
   font-weight: 600;
 }
 .dsh_mr_ovEffort { color: var(--dsw-alias-label-secondary); }
+.dsh_mr_ovHarness {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 7px;
+  font-size: 9.5px;
+  line-height: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.dsh_mr_ovHarnessDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsh-mr-harness-color, var(--dsw-alias-label-secondary));
+}
+.dsh_mr_ovHarness[data-harness='codex'] { --dsh-mr-harness-color: #8b5cf6; }
+.dsh_mr_ovHarness[data-harness='dsh'] { --dsh-mr-harness-color: #4d6bfe; }
+.dsh_mr_ovHarness[data-harness='zcode'] { --dsh-mr-harness-color: #06b6d4; }
+.dsh_mr_ovHarness[data-harness='grok'] { --dsh-mr-harness-color: #f59e0b; }
+.dsh_mr_ovHarness[data-harness='kimi-code'] { --dsh-mr-harness-color: #10b981; }
+.dsh_mr_ovHarnessLabel { color: var(--dsw-alias-label-secondary); letter-spacing: 0.2px; }
 .dsh_mr_ovChild .dsh_mr_ovName { color: var(--dsw-alias-label-secondary); }
 .dsh_mr_ovDelta {
   font-size: 11.5px;
@@ -513,6 +536,19 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_trendStat strong[data-dir="flat"] { color: var(--dsw-alias-label-secondary); }
 .dsh_mr_trendWrap { position: relative; min-width: 0; }
 .dsh_mr_trendWrap svg { display: block; width: 100%; height: auto; }
+/* Dual-window trend stack (near-24h above near-7d): one card, two
+   independently scaled panels separated by a dashed seam. */
+.dsh_mr_trendStack { display: flex; flex-direction: column; gap: 14px; }
+.dsh_mr_trendPanel + .dsh_mr_trendPanel {
+  border-top: 1px dashed var(--dsw-alias-border-l2);
+  padding-top: 12px;
+}
+.dsh_mr_trendPanelHead {
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+}
 .dsh_mr_tip {
   position: absolute;
   pointer-events: none;

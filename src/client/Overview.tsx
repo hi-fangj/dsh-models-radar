@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { RadarTier, RadarView } from '../contract.ts'
 import type { ModelRadarKey } from './locales.ts'
 import { PersistentScrollFrame } from './ScrollFrame.tsx'
+import { harnessMeta, harnessOfModel } from './harness.ts'
 import { iqBand, iqProgress, trendSummary } from './scoreMetrics.ts'
 
 interface OverviewProps {
@@ -104,6 +105,7 @@ export function TierOverview({ view, selectedKey, currentKey, onSelect, t, scrol
         const hasSelectedChild =
           selectedKey !== null && group.tiers.some((tier) => tier.key === selectedKey && tier.key !== group.best.key)
         const isCurrent = currentKey !== null && currentKey !== undefined && group.tiers.some((tier) => tier.key === currentKey)
+        const harness = harnessOfModel(group.base)
         const widthPct = iqProgress(group.best.iq) * 100
         const band = iqBand(group.best.iq)
         return (
@@ -141,6 +143,20 @@ export function TierOverview({ view, selectedKey, currentKey, onSelect, t, scrol
                   {group.base}
                   <span className="dsh_mr_ovEffort"> · {group.best.effort}</span>
                 </span>
+                {/* Harness badge sits outside the truncating flow (same
+                    flex:none pattern as the current-model mark): it states
+                    which runner produced this base's scores. Unmatched bases
+                    render no badge at all — attribution is never guessed. */}
+                {harness && (
+                  <span
+                    className="dsh_mr_ovHarness"
+                    data-harness={harness}
+                    title={`Harness · ${harnessMeta(harness).label}`}
+                  >
+                    <span className="dsh_mr_ovHarnessDot" />
+                    <span className="dsh_mr_ovHarnessLabel">{harnessMeta(harness).label}</span>
+                  </span>
+                )}
                 {isCurrent && <span className="dsh_mr_ovCurrent">{t('overview.current')}</span>}
               </span>
               <DeltaBadge points={view.series[group.best.key]} />

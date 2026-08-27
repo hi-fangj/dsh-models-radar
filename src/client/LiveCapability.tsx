@@ -22,8 +22,9 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RadarPayload, RadarTier, RadarView } from '../contract.ts'
 import { bandColor, iqBand, trendSummary } from './scoreMetrics.ts'
 import { moneyText, minutesText, pctText } from './format.ts'
-import { TaskBars, TrendLine } from './charts.tsx'
+import { TaskBars, DualTrendPanels } from './charts.tsx'
 import { TierOverview } from './Overview.tsx'
+import { tierGroupsForView } from './harness.ts'
 import { fmt } from './locales.ts'
 
 /** Dock polling period: matches the host's shortest freshness window (15 min, host-side FRESH_EFFICIENCY_MS). */
@@ -189,6 +190,11 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
     setViewTierKey(null)
   }, [match?.tier.key])
 
+  // Grouped options for the trend card's tier selector (settings-page format).
+  // MUST stay above the early-return guard below: hooks run unconditionally,
+  // or React's render-count invariant kills the whole dock subtree.
+  const tierGroups = useMemo(() => tierGroupsForView(view?.tiers ?? []), [view])
+
   if (view === null || selection === null || match === null) return null
 
   const tier = match.tier
@@ -265,9 +271,32 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
                 ))}
               </div>
               <div className="dsh_mr_card">
-                <span className="dsh_mr_cardTitle">{t('line.title')}</span>
+                <div className="dsh_mr_cardHead">
+                  <span className="dsh_mr_cardTitle">{t('line.title')}</span>
+                  {/* Same grouped tier selector as the settings trend card
+                      (base+harness optgroups, effort · IQ options). Picking a
+                      tier is temporary viewing — identical to clicking an
+                      overview row: it resets to following the session match
+                      when the match moves or the popover closes. */}
+                  <select
+                    className="dsh_mr_select"
+                    value={detailTier.key}
+                    onChange={(event) => setViewTierKey(event.target.value)}
+                    aria-label={t('line.title')}
+                  >
+                    {tierGroups.map((group) => (
+                      <optgroup key={group.base} label={group.label}>
+                        {group.tiers.map((candidate) => (
+                          <option key={candidate.key} value={candidate.key}>
+                            {candidate.effort} · IQ {candidate.iq.toFixed(1)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
                 {detailSeries.length >= 2 ? (
-                  <TrendLine points={detailSeries} t={t} />
+                  <DualTrendPanels points={detailSeries} t={t} />
                 ) : (
                   <div className="dsh_mr_empty">{t('empty.noSeries')}</div>
                 )}

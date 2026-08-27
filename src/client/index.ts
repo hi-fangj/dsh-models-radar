@@ -1,5 +1,5 @@
 /**
- * dsh-models-radar client half: mounts the「模型能力」settings section via the
+ * dsh-models-radar client half: mounts the「模型雷达」settings section via the
  * additive `settings.section` slot and registers its locale dictionaries.
  * All codexradar access happens in the host half over the package's
  * same-origin route; this half only renders.

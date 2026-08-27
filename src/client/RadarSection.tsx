@@ -1,5 +1,5 @@
 /**
- * The「模型能力」settings section: channel switcher, efficiency badges, the
+ * The「模型雷达」settings section: channel switcher, efficiency badges, the
  * tier picker with an IQ trend line, and the per-task pass-composition bars.
  *
  * Data flows through the host half's same-origin /model-radar/api/data route
@@ -17,7 +17,8 @@ import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { RadarPayload, RadarView } from '../contract.ts'
 import { fmt } from './locales.ts'
 import { TierOverview } from './Overview.tsx'
-import { TaskBars, TrendLine } from './charts.tsx'
+import { TaskBars, DualTrendPanels } from './charts.tsx'
+import { tierGroupsForView } from './harness.ts'
 import { iqBand } from './scoreMetrics.ts'
 import { moneyText, minutesText, pctText } from './format.ts'
 
@@ -137,6 +138,9 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
   const channels = view !== null && view.channels.length > 0 ? view.channels : FALLBACK_CHANNELS
   const taskRows = tierKey !== null ? (view?.taskRates[tierKey] ?? []) : []
   const seriesPoints = tierKey !== null ? (view?.series[tierKey] ?? []) : []
+  // Trend-card tier dropdown: the overview's base→effort grouping with the
+  // base's harness in each group label (see tierGroupsForView).
+  const tierGroups = useMemo(() => (view === null ? [] : tierGroupsForView(view.tiers)), [view])
 
   const badges: Array<{ label: string; value: string; accent?: boolean; band?: string }> = [
     {
@@ -158,7 +162,7 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
           <h2 className="dsh_mr_title">{t('title')}</h2>
           <div className="dsh_mr_subtitle">{t('subtitle')}</div>
         </div>
-        <div className="dsh_mr_seg" role="tablist" aria-label={t('nav')}>
+        <div className="dsh_mr_seg" role="tablist" aria-label={t('channel.label')}>
           {channels.map((channel) => (
             <button
               key={channel.id}
@@ -228,16 +232,20 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
                 aria-label={t('line.title')}
               >
                 {tierKey === null && <option value="">—</option>}
-                {view.tiers.map((candidate) => (
-                  <option key={candidate.key} value={candidate.key}>
-                    {candidate.model} · {candidate.effort} · IQ {candidate.iq.toFixed(1)}
-                  </option>
+                {tierGroups.map((group) => (
+                  <optgroup key={group.base} label={group.label}>
+                    {group.tiers.map((candidate) => (
+                      <option key={candidate.key} value={candidate.key}>
+                        {candidate.effort} · IQ {candidate.iq.toFixed(1)}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
             {matchHint !== null && <div className="dsh_mr_hint">{matchHint}</div>}
             {seriesPoints.length >= 2 ? (
-              <TrendLine points={seriesPoints} t={t} />
+              <DualTrendPanels points={seriesPoints} t={t} />
             ) : (
               <div className="dsh_mr_empty">{t('empty.noSeries')}</div>
             )}

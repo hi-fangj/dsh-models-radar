@@ -4,7 +4,7 @@ import type { MouseEvent } from 'react'
 import type { ModelRadarKey } from './locales.ts'
 import { fmt } from './locales.ts'
 import { PersistentScrollFrame } from './ScrollFrame.tsx'
-import { bandColor, iqBand, trendSummary } from './scoreMetrics.ts'
+import { bandColor, iqBand, sliceRecentPoints, windowSummary } from './scoreMetrics.ts'
 import type { IqBand } from './scoreMetrics.ts'
 
 const TREND_W = 640
@@ -90,9 +90,24 @@ function buildSegments(values: number[], x: (index: number) => number, y: (value
   return pieces.map(({ color, d, x0, x1 }) => ({ color, path: d.join(' '), x0, x1 }))
 }
 
-export function TrendLine({ points, t }: { points: Array<[string, number]>; t: Translate }) {
+/**
+ * One time-window trend panel: captioned chart with its own symmetric stats
+ * row (net change / low / average / high over this window). Fewer than two
+ * points renders the caption plus an empty-state text instead of a chart.
+ */
+export function TrendPanel({
+  title,
+  emptyText,
+  points,
+  t,
+}: {
+  title: string
+  emptyText: string
+  points: Array<[string, number]>
+  t: Translate
+}) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
-  const summary = trendSummary(points)
+  const summary = windowSummary(points)
 
   const geometry = useMemo(() => {
     if (points.length < 2) return null
@@ -126,25 +141,34 @@ export function TrendLine({ points, t }: { points: Array<[string, number]>; t: T
     }
   }, [points])
 
-  if (geometry === null || summary === null) return <div className="dsh_mr_empty" />
+  const head = <div className="dsh_mr_trendPanelHead">{title}</div>
+  if (geometry === null || summary === null) {
+    return (
+      <section className="dsh_mr_trendPanel">
+        {head}
+        <div className="dsh_mr_empty">{emptyText}</div>
+      </section>
+    )
+  }
 
   const { lo, hi, x, y, last, baseline, segments, bandLines } = geometry
   const mid = (lo + hi) / 2
   const hovered = hoverIndex !== null ? points[hoverIndex] : undefined
-  const deltaText =
+  const changeText =
     summary.direction === 'flat'
       ? '±0.0'
-      : `${summary.delta24h > 0 ? '+' : ''}${summary.delta24h.toFixed(1)}`
+      : `${summary.change > 0 ? '+' : ''}${summary.change.toFixed(1)}`
   // The endpoint and hover markers carry the capability band color: the
   // momentum semantics live in the delta badge and trend stats instead.
   const endpointColor = bandColor(iqBand(points[last][1]))
 
   return (
-    <>
+    <section className="dsh_mr_trendPanel">
+      {head}
       <div className="dsh_mr_trendStats">
         <span className="dsh_mr_trendStat">
-          <span className="dsh_mr_trendStatLabel">{t('trend.delta24h')}</span>
-          <strong data-dir={summary.direction}>{deltaText}</strong>
+          <span className="dsh_mr_trendStatLabel">{t('trend.change')}</span>
+          <strong data-dir={summary.direction}>{changeText}</strong>
         </span>
         <span className="dsh_mr_trendStat"><span className="dsh_mr_trendStatLabel">{t('trend.min')}</span><strong>{summary.min.toFixed(1)}</strong></span>
         <span className="dsh_mr_trendStat"><span className="dsh_mr_trendStatLabel">{t('trend.average')}</span><strong>{summary.average.toFixed(1)}</strong></span>
@@ -154,7 +178,7 @@ export function TrendLine({ points, t }: { points: Array<[string, number]>; t: T
         <svg
           viewBox={`0 0 ${TREND_W} ${TREND_H}`}
           role="img"
-          aria-label="IQ trend"
+          aria-label={`${title} · IQ trend`}
           onMouseMove={(event: MouseEvent<SVGSVGElement>) => {
             const rect = event.currentTarget.getBoundingClientRect()
             const relX = ((event.clientX - rect.left) / rect.width) * TREND_W
@@ -202,7 +226,21 @@ export function TrendLine({ points, t }: { points: Array<[string, number]>; t: T
           </div>
         )}
       </div>
-    </>
+    </section>
+  )
+}
+
+/**
+ * The trend card body: near-24h and near-7d windows shown as separate stacked
+ * panels over the same hourly series (time-sliced; some tiers carry sub-hourly
+ * readings). Each panel scales its own y-axis and carries its own stats.
+ */
+export function DualTrendPanels({ points, t }: { points: Array<[string, number]>; t: Translate }) {
+  return (
+    <div className="dsh_mr_trendStack">
+      <TrendPanel title={t('window.24h')} emptyText={t('empty.noRecent')} points={sliceRecentPoints(points, 24)} t={t} />
+      <TrendPanel title={t('window.7d')} emptyText={t('empty.noSeries')} points={points} t={t} />
+    </div>
   )
 }
 
