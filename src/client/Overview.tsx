@@ -3,9 +3,11 @@
  * ranked. Each row carries an inline magnitude micro-bar behind the IQ value,
  * a 24h trend signal (↑/↓/→ with Δ), and doubles as navigation — clicking a
  * row selects that tier for every chart below. A base model collapses to its
- * best effort; the chevron expands its full effort ladder.
+ * best effort; the chevron expands its full effort ladder. A selection that
+ * sits on a hidden child (popover follow mode, the settings dropdown) opens
+ * its ladder so the gray row never hides behind a collapsed group.
  */
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { RadarTier, RadarView } from '../contract.ts'
 import type { ModelRadarKey } from './locales.ts'
 import { PersistentScrollFrame } from './ScrollFrame.tsx'
@@ -40,6 +42,14 @@ function groupByBase(view: RadarView): BaseGroup[] {
   return [...groups.entries()].map(([base, tiers]) => ({ base, tiers, best: tiers[0] }))
 }
 
+/** Bases whose effort ladder would hide the selected row: the selection sits on a non-best child. */
+function basesHidingSelection(groups: BaseGroup[], selectedKey: string | null): string[] {
+  if (selectedKey === null) return []
+  return groups
+    .filter((group) => group.tiers.some((tier) => tier.key === selectedKey && tier.key !== group.best.key))
+    .map((group) => group.base)
+}
+
 function DeltaBadge({ points }: { points: Array<[string, number]> | undefined }) {
   const summary = trendSummary(points ?? [])
   if (summary === null) return <span className="dsh_mr_ovDelta" data-dir="none">—</span>
@@ -56,8 +66,25 @@ function DeltaBadge({ points }: { points: Array<[string, number]> | undefined })
 }
 
 export function TierOverview({ view, selectedKey, currentKey, onSelect, t, scroll = true }: OverviewProps) {
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
-  const groups = groupByBase(view)
+  const groups = useMemo(() => groupByBase(view), [view])
+  // Seed open with ladders that would otherwise hide the selected child row.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(basesHidingSelection(groups, selectedKey)))
+  // Keep following the selection: a pick landing on a collapsed ladder's child
+  // re-opens that ladder so the gray row stays visible. The chevron can still
+  // collapse it afterwards — this only re-fires when the selection moves again.
+  useEffect(() => {
+    setExpanded((previous) => {
+      let changed = false
+      const next = new Set(previous)
+      for (const base of basesHidingSelection(groups, selectedKey)) {
+        if (!next.has(base)) {
+          next.add(base)
+          changed = true
+        }
+      }
+      return changed ? next : previous
+    })
+  }, [groups, selectedKey])
   if (groups.length === 0) return null
 
   const toggle = (base: string): void => {
