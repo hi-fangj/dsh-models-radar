@@ -546,7 +546,9 @@ span.dsh_mr_ovChevron { cursor: default; }
   font-weight: 600;
   color: var(--dsw-alias-label-secondary);
 }
-/* Cost × IQ scatter card: filter chip row + effort shape legend. */
+/* Cost × IQ scatter card: filter chip row + effort shape legend.
+   Chip states follow the site's toggles: brand-colored pill when on,
+   faded + struck-through when off, hover lifts both. */
 .dsh_mr_costTitleGroup {
   display: flex;
   align-items: baseline;
@@ -557,33 +559,75 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_costChips {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
   margin-bottom: 12px;
 }
 .dsh_mr_costChip {
+  --chip-color: var(--dsw-alias-label-secondary);
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 2px 9px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 1px solid color-mix(in srgb, var(--chip-color) 54%, var(--dsw-alias-border-l2));
   border-radius: 999px;
-  background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-label-secondary);
+  background: color-mix(in srgb, var(--chip-color) 9%, transparent);
+  color: var(--dsw-alias-label-primary);
   font: inherit;
   font-size: 11px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    opacity 0.14s ease,
+    border-color 0.14s ease,
+    background-color 0.14s ease;
 }
-.dsh_mr_costChip[data-active='true'] {
-  color: var(--dsw-alias-label-primary);
+.dsh_mr_costChip:hover {
+  border-color: var(--chip-color);
+  background: color-mix(in srgb, var(--chip-color) 14%, transparent);
+}
+.dsh_mr_costChip[data-active='false'] {
+  opacity: 0.45;
+  border-color: var(--dsw-alias-border-l2);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  text-decoration: line-through;
+}
+.dsh_mr_costChip[data-active='false']:hover { opacity: 0.8; }
+.dsh_mr_costChip[data-all] {
+  border-style: dashed;
+  border-color: var(--dsw-alias-border-l2);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+}
+.dsh_mr_costChip[data-all]:hover {
   border-color: var(--dsw-alias-border-l1);
+  color: var(--dsw-alias-label-primary);
 }
 .dsh_mr_costChipDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--chip-color);
   flex: none;
 }
+.dsh_mr_costChip[data-active='true'] .dsh_mr_costChipDot { box-shadow: 0 0 2px var(--chip-color); }
+.dsh_mr_costChip[data-active='false'] .dsh_mr_costChipDot { background: var(--dsw-alias-label-secondary); }
+.dsh_mr_costScope { font-size: 10.5px; color: var(--dsw-alias-label-secondary); }
+/* Outbound links to the source site: quiet, brand-tinted, underline on hover. */
+.dsh_mr_link {
+  flex: none;
+  color: var(--dsw-alias-brand-primary);
+  text-decoration: none;
+}
+.dsh_mr_link:hover { text-decoration: underline; }
+/* Model-focus dimming (site parity): hovering a chip focuses that base's
+   series alone — others fade to 0.16, the focused ladder thickens. */
+.dsh_mr_costSeries { transition: opacity 0.16s ease; }
+.dsh_mr_trendPanel[data-model-focus='true'] .dsh_mr_costSeries.is-muted { opacity: 0.16; }
+.dsh_mr_trendPanel[data-model-focus='true'] .dsh_mr_costSeries.is-focused { opacity: 1; }
+.dsh_mr_trendPanel[data-model-focus='true'] .dsh_mr_costLadder.is-focused { stroke-width: 3; }
 .dsh_mr_costLegend {
   display: inline-flex;
   flex-wrap: wrap;

@@ -10,7 +10,7 @@
  * or snapshot changes. Tiers missing a metric simply stay off that panel.
  */
 import { useMemo, useState } from 'react'
-import type { MouseEvent } from 'react'
+import type { CSSProperties, MouseEvent } from 'react'
 import type { RadarTier, RadarView } from '../contract.ts'
 import type { ModelRadarKey } from './locales.ts'
 
@@ -149,14 +149,22 @@ function CostPanel({
   title,
   metric,
   points,
+  focus,
   t,
 }: {
   title?: string
   metric: 'combined' | 'minutes' | 'price'
   points: ScatterPoint[]
+  /** Hovered/focused base model, or null; dims every other series. */
+  focus: string | null
   t: (key: ModelRadarKey) => string
 }) {
   const [hover, setHover] = useState<number | null>(null)
+
+  const seriesClass = (model: string): string => {
+    if (focus === null) return 'dsh_mr_costSeries'
+    return focus === model ? 'dsh_mr_costSeries is-focused' : 'dsh_mr_costSeries is-muted'
+  }
 
   const head = title !== undefined ? <div className="dsh_mr_trendPanelHead">{title}</div> : null
   if (points.length === 0) {
@@ -185,7 +193,7 @@ function CostPanel({
   const hovered = hover !== null ? points[hover] : undefined
 
   return (
-    <section className="dsh_mr_trendPanel">
+    <section className="dsh_mr_trendPanel" data-model-focus={focus !== null ? 'true' : undefined}>
       {head}
       <div className="dsh_mr_trendWrap">
         <svg
@@ -227,6 +235,7 @@ function CostPanel({
             ladder.length > 1 ? (
               <path
                 key={ladder[0].tier.model}
+                className={`${seriesClass(ladder[0].tier.model)} dsh_mr_costLadder`}
                 d={ladder.map((point, index) => `${index ? 'L' : 'M'}${px(point.x).toFixed(1)} ${py(point.tier.iq).toFixed(1)}`).join(' ')}
                 fill="none"
                 stroke={modelColor(ladder[0].tier.model)}
@@ -240,6 +249,7 @@ function CostPanel({
           {points.map(({ tier, x }, index) => (
             <path
               key={tier.key}
+              className={seriesClass(tier.model)}
               d={effortShapePath(tier.effort, px(x), py(tier.iq), 5)}
               fill="var(--dsw-alias-bg-layer-1)"
               stroke={modelColor(tier.model)}
@@ -292,6 +302,8 @@ export function CostScatterCard({ view, t }: { view: RadarView; t: (key: ModelRa
   }, [view])
   const [hidden, setHidden] = useState<Set<string>>(() => new Set(DEFAULT_HIDDEN_BASES))
   const [metric, setMetric] = useState<CostMetric>(readCostMetric)
+  /** Base model whose chip is hovered: the chart focuses its series alone. */
+  const [focus, setFocus] = useState<string | null>(null)
 
   const toggle = (base: string): void => {
     setHidden((previous) => {
@@ -356,9 +368,14 @@ export function CostScatterCard({ view, t }: { view: RadarView; t: (key: ModelRa
             type="button"
             className="dsh_mr_costChip"
             data-active={!hidden.has(base)}
+            style={{ '--chip-color': modelColor(base) } as CSSProperties}
             onClick={() => toggle(base)}
+            onMouseEnter={() => setFocus(base)}
+            onMouseLeave={() => setFocus(null)}
+            onFocus={() => setFocus(base)}
+            onBlur={() => setFocus(null)}
           >
-            <span className="dsh_mr_costChipDot" style={{ background: modelColor(base) }} />
+            <span className="dsh_mr_costChipDot" />
             {base}
           </button>
         ))}
@@ -379,7 +396,7 @@ export function CostScatterCard({ view, t }: { view: RadarView; t: (key: ModelRa
             </button>
           ))}
         </div>
-        <CostPanel metric={metric} points={TAB_POINTS[metric]} t={t} />
+        <CostPanel metric={metric} points={TAB_POINTS[metric]} focus={focus} t={t} />
       </div>
     </div>
   )

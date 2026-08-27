@@ -4,6 +4,9 @@
  * import the types without dragging code across the boundary.
  */
 
+/** The crowd-benchmark site this plugin reads, for display links. */
+export const SOURCE_SITE_URL = 'https://deng.codexradar.com'
+
 /** One model×effort tier on the leaderboard. */
 export interface RadarTier {
   /** Canonical tier key: `${model}@${effort}`. */

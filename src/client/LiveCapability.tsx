@@ -20,6 +20,7 @@ import type { PropsLocale, PropsRuntime, InjectFace } from '@deepseek-ai/dsh-cli
 import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import type { RadarPayload, RadarTier, RadarView } from '../contract.ts'
+import { SOURCE_SITE_URL } from '../contract.ts'
 import { bandColor, iqBand, trendSummary } from './scoreMetrics.ts'
 import { moneyText, minutesText, pctText } from './format.ts'
 import { TaskBars, TrendTabs } from './charts.tsx'
@@ -313,6 +314,9 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
             </div>
             <footer className="dsh_mr_popoverFooter">
               {fmt(t('updated'), { time: new Date(view.fetchedAt).toLocaleString() })}
+              <a className="dsh_mr_link" href={SOURCE_SITE_URL} target="_blank" rel="noreferrer noopener">
+                {t('action.openSite')} ↗
+              </a>
             </footer>
           </section>,
           document.body,

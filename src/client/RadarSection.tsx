@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { RadarPayload, RadarView } from '../contract.ts'
+import { SOURCE_SITE_URL } from '../contract.ts'
 import { fmt } from './locales.ts'
 import { TierOverview } from './Overview.tsx'
 import { TaskBars, TrendTabs } from './charts.tsx'
@@ -158,7 +159,13 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
       <div className="dsh_mr_header">
         <div>
           <h2 className="dsh_mr_title">{t('title')}</h2>
-          <div className="dsh_mr_subtitle">{t('subtitle')}</div>
+          <div className="dsh_mr_subtitle">
+            {t('subtitle.pre')}
+            <a className="dsh_mr_link" href={SOURCE_SITE_URL} target="_blank" rel="noreferrer noopener">
+              deng.codexradar.com
+            </a>
+            {t('subtitle.post')}
+          </div>
         </div>
         <div className="dsh_mr_seg" role="tablist" aria-label={t('channel.label')}>
           {channels.map((channel) => (
@@ -270,6 +277,9 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
                 · {t('source.updated')}: {new Date(view.sourceUpdatedAt).toLocaleString()}
               </span>
             )}
+            <a className="dsh_mr_link" href={SOURCE_SITE_URL} target="_blank" rel="noreferrer noopener">
+              {t('action.openSite')} ↗
+            </a>
             <span className="dsh_mr_footerSpacer" />
             <button
               type="button"
