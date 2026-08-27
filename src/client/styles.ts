@@ -281,9 +281,17 @@ export const cssText = `
 }
 .dsh_mr_ovChevron[data-open="true"] { transform: rotate(90deg); }
 span.dsh_mr_ovChevron { cursor: default; }
+/* Flex row: the inner span owns the ellipsis truncation, so the current-model
+   mark (a flex:none sibling) can never be squeezed into the clipped flow. */
 .dsh_mr_ovName {
+  display: flex;
+  align-items: center;
+  min-width: 0;
   font-size: 12.5px;
   color: var(--dsw-alias-label-primary);
+}
+.dsh_mr_ovNameText {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

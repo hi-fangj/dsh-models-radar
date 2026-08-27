@@ -106,9 +106,14 @@ export function TierOverview({ view, selectedKey, currentKey, onSelect, t, scrol
               >
                 ▸
               </button>
+              {/* The truncating text lives in an inner span so the current-model
+                  mark stays outside the ellipsis flow: nested inside it, a long
+                  name would clip the badge into a broken empty outline. */}
               <span className="dsh_mr_ovName" title={group.base}>
-                {group.base}
-                <span className="dsh_mr_ovEffort"> · {group.best.effort}</span>
+                <span className="dsh_mr_ovNameText">
+                  {group.base}
+                  <span className="dsh_mr_ovEffort"> · {group.best.effort}</span>
+                </span>
                 {isCurrent && <span className="dsh_mr_ovCurrent">{t('overview.current')}</span>}
               </span>
               <DeltaBadge points={view.series[group.best.key]} />
@@ -136,7 +141,9 @@ export function TierOverview({ view, selectedKey, currentKey, onSelect, t, scrol
                   >
                     <span className="dsh_mr_ovRank" />
                     <span className="dsh_mr_ovChevron" />
-                    <span className="dsh_mr_ovName">{tier.effort}</span>
+                    <span className="dsh_mr_ovName">
+                      <span className="dsh_mr_ovNameText">{tier.effort}</span>
+                    </span>
                     <DeltaBadge points={view.series[tier.key]} />
                     <span className="dsh_mr_ovIqCell">
                       <span
