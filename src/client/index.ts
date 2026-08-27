@@ -46,7 +46,11 @@ export function apply(ctx: ClientContext): void {
     id: 'model-radar',
     order: 25,
     label: () => t('nav'),
-    icon: 'radar',
+    // The shell matches this against a hardcoded whitelist — shipped shells
+    // only special-case "data" / "agent-preset" / "personalization" and fall
+    // back to a generic gear for anything else (a "radar" branch exists only
+    // in unreleased dev shells). "data" is the closest attributed glyph.
+    icon: 'data',
     locale: NS,
     inject: (): RadarInjected => ({ loadData }),
   }, RadarSection))
