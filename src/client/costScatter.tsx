@@ -22,6 +22,8 @@ import {
   type CostLadder,
   type ScatterPoint,
 } from './costMetrics.ts'
+import { AXIS_STYLE, HGrid, PLOT_H, PLOT_W, PlotTip, viewBoxX } from './plotFrame.tsx'
+import { logDomain } from './plotGeometry.ts'
 
 /** Site-canonical per-base palette (its MODEL_COLORS table, verbatim). */
 const MODEL_COLORS: Record<string, string> = {
@@ -60,7 +62,7 @@ function effortShapePath(effort: string, cx: number, cy: number, r: number): str
   }
   if (effort === 'high') {
     const s = r * 0.82
-    return `M${point(x - s, y - s)} H${(x + s).toFixed(1)} V${(y + s).toFixed(1)} H${(x - s).toFixed(1)} Z`
+    return `M${point(x - s, y - s)} PLOT_H${(x + s).toFixed(1)} V${(y + s).toFixed(1)} PLOT_H${(x - s).toFixed(1)} Z`
   }
   if (effort === 'xhigh') {
     return `M${point(x, y - r)} L${point(x + r, y)} L${point(x, y + r)} L${point(x - r, y)} Z`
@@ -105,11 +107,8 @@ function fmtX(metric: 'combined' | 'minutes' | 'price', value: number): string {
   return value < 1 ? value.toFixed(2) : value < 10 ? value.toFixed(1) : Math.round(value).toString()
 }
 
-const W = 640
-const H = 190
 const PAD = { top: 14, right: 16, bottom: 26, left: 40 }
 const IQ_MAX = 120
-const AXIS_STYLE = { fontSize: 10.5, fill: 'var(--dsw-alias-label-secondary)' } as const
 
 /**
  * One log-x panel: IQ gridlines, decade ticks, and one shape marker per
@@ -149,16 +148,11 @@ function CostPanel({
     )
   }
 
-  let lo = Math.min(...points.map((point) => point.x))
-  let hi = Math.max(...points.map((point) => point.x))
-  if (!(hi / lo > 1.0000001)) {
-    lo /= 3
-    hi *= 3
-  }
+  const { lo, hi } = logDomain(points.map((point) => point.x))
   const loLog = Math.log10(lo)
   const spanLog = Math.log10(hi) - loLog
-  const innerW = W - PAD.left - PAD.right
-  const innerH = H - PAD.top - PAD.bottom
+  const innerW = PLOT_W - PAD.left - PAD.right
+  const innerH = PLOT_H - PAD.top - PAD.bottom
   const px = (value: number): number => PAD.left + ((Math.log10(value) - loLog) / spanLog) * innerW
   const py = (iq: number): number => PAD.top + (1 - Math.min(iq, IQ_MAX) / IQ_MAX) * innerH
   const ticks = logTicks(lo, hi)
@@ -170,12 +164,11 @@ function CostPanel({
       {head}
       <div className="dsh_mr_trendWrap">
         <svg
-          viewBox={`0 0 ${W} ${H}`}
+          viewBox={`0 0 ${PLOT_W} ${PLOT_H}`}
           role="img"
           aria-label={title}
           onMouseMove={(event: MouseEvent<SVGSVGElement>) => {
-            const rect = event.currentTarget.getBoundingClientRect()
-            const relX = ((event.clientX - rect.left) / rect.width) * W
+            const relX = viewBoxX(event, PLOT_W)
             let best = 0
             let bestDist = Number.POSITIVE_INFINITY
             points.forEach((point, index) => {
@@ -190,15 +183,12 @@ function CostPanel({
           onMouseLeave={() => setHover(null)}
         >
           {iqTicks.map((value) => (
-            <g key={value}>
-              <line x1={PAD.left} x2={W - PAD.right} y1={py(value)} y2={py(value)} stroke="var(--dsw-alias-border-l1)" strokeDasharray={value === 0 ? 'none' : '3 4'} />
-              <text x={PAD.left - 6} y={py(value) + 3.5} textAnchor="end" style={AXIS_STYLE}>{value}</text>
-            </g>
+            <HGrid key={value} y={py(value)} x1={PAD.left} x2={PLOT_W - PAD.right} label={value} dash={value === 0 ? 'none' : '3 4'} />
           ))}
           {ticks.map((value) => (
             <g key={value}>
-              <line x1={px(value)} x2={px(value)} y1={PAD.top} y2={H - PAD.bottom} stroke="var(--dsw-alias-border-l1)" strokeDasharray="3 4" />
-              <text x={px(value)} y={H - 8} textAnchor="middle" style={AXIS_STYLE}>{fmtX(metric, value)}</text>
+              <line x1={px(value)} x2={px(value)} y1={PAD.top} y2={PLOT_H - PAD.bottom} stroke="var(--dsw-alias-border-l1)" strokeDasharray="3 4" />
+              <text x={px(value)} y={PLOT_H - 8} textAnchor="middle" style={AXIS_STYLE}>{fmtX(metric, value)}</text>
             </g>
           ))}
           {/* Same-base ladder lines beneath the markers, site parity: points
@@ -231,12 +221,9 @@ function CostPanel({
           ))}
         </svg>
         {hovered !== undefined && (
-          <div
-            className="dsh_mr_tip"
-            style={{ left: `${(px(hovered.x) / W) * 100}%`, top: `${(py(hovered.iq) / H) * 100}%` }}
-          >
+          <PlotTip x={px(hovered.x)} y={py(hovered.iq)} width={PLOT_W} height={PLOT_H}>
             {hovered.tier.model} · {hovered.tier.effort} · IQ {hovered.tier.iq.toFixed(1)} · {fmtX(metric, hovered.x)}
-          </div>
+          </PlotTip>
         )}
       </div>
     </section>

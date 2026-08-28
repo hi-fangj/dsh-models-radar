@@ -18,11 +18,9 @@ import type { RadarPayload, RadarView } from '../contract.ts'
 import { SOURCE_SITE_URL } from '../contract.ts'
 import { fmt } from './locales.ts'
 import { TierOverview } from './Overview.tsx'
-import { TaskBars, TrendTabs } from './charts.tsx'
 import { CostScatterCard } from './costScatter.tsx'
-import { tierOptionLabel } from './harness.ts'
-import { iqBand } from './scoreMetrics.ts'
-import { moneyText, minutesText, pctText } from './format.ts'
+import { matchTier } from './tierMatch.ts'
+import { TaskCard, TierBadges, TrendCard } from './TierDetail.tsx'
 
 /** Injected business face: the same-origin data loader. */
 export interface RadarInjected {
@@ -39,34 +37,6 @@ const FALLBACK_CHANNELS: RadarView['channels'] = [
   { id: 'deep-swe', title: 'DeepSWE', scoreLabel: 'Pass rate', isDefault: true },
   { id: 'pompeii-adjacency', title: '庞贝壁画', scoreLabel: 'Adjacency F1', isDefault: false },
 ]
-
-/** Take the provider-qualified id down to its bare model token, case-folded. */
-function normalizeModelToken(model: string): string {
-  return model.split('/').pop()?.trim().toLowerCase() ?? model.toLowerCase()
-}
-
-/**
- * Q5's three-step match of the deployment default model against leaderboard
- * tiers: exact `model@effort`, then any effort of the same model (tiers are
- * IQ-sorted so the first hit is the strongest), then a substring fallback.
- */
-export function autoMatchTier(view: RadarView): string | null {
-  const selection = view.defaultModel
-  if (selection === undefined) return null
-  const model = normalizeModelToken(selection.model)
-  if (model === '') return null
-  const effort = selection.reasoningEffort?.toLowerCase()
-  if (effort !== undefined && effort !== '') {
-    const exact = view.tiers.find((tier) => tier.model.toLowerCase() === model && tier.effort.toLowerCase() === effort)
-    if (exact !== undefined) return exact.key
-  }
-  const base = view.tiers.find((tier) => tier.model.toLowerCase() === model)
-  if (base !== undefined) return base.key
-  const fuzzy = view.tiers.find(
-    (tier) => tier.model.toLowerCase().includes(model) || model.includes(tier.model.toLowerCase()),
-  )
-  return fuzzy?.key ?? null
-}
 
 /**
  * Render the radar section.
@@ -118,7 +88,11 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
     setSelectedKey(localStorage.getItem(tierStorageKey(benchmark)))
   }, [benchmark])
 
-  const autoKey = useMemo(() => (view === null ? null : autoMatchTier(view)), [view])
+  // 档位匹配（CONTEXT.md）：部署默认模型 → 默认选中档位；近似命中不设 ≈ 标识。
+  const autoKey = useMemo(
+    () => (view === null ? null : (matchTier(view, view.defaultModel)?.tier.key ?? null)),
+    [view],
+  )
   const tierKey = selectedKey ?? autoKey
   const tier = view?.tiers.find((candidate) => candidate.key === tierKey) ?? null
   const matchHint =
@@ -138,21 +112,7 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
   }
 
   const channels = view !== null && view.channels.length > 0 ? view.channels : FALLBACK_CHANNELS
-  const taskRows = tierKey !== null ? (view?.taskRates[tierKey] ?? []) : []
   const seriesPoints = tierKey !== null ? (view?.series[tierKey] ?? []) : []
-
-  const badges: Array<{ label: string; value: string; accent?: boolean; band?: string }> = [
-    {
-      label: t('badge.iq'),
-      value: tier !== null ? tier.iq.toFixed(1) : '—',
-      accent: true,
-      band: tier !== null ? iqBand(tier.iq) : undefined,
-    },
-    { label: t('badge.price'), value: moneyText(tier?.avgPrice ?? null) },
-    { label: t('badge.minutes'), value: minutesText(tier?.avgMinutes ?? null) },
-    { label: t('badge.cache'), value: tier?.cacheHit != null ? pctText(tier.cacheHit) : '—' },
-    { label: t('badge.runs'), value: tier !== null ? String(tier.runs24h) : '—' },
-  ]
 
   return (
     <section className="dsh_mr_section">
@@ -216,52 +176,18 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
         <>
           <TierOverview view={view} selectedKey={tierKey} onSelect={selectTier} t={t} />
 
-          <div className="dsh_mr_badges">
-            {badges.map((badge) => (
-              <div className="dsh_mr_badge" key={badge.label}>
-                <span className="dsh_mr_badgeVal" data-accent={badge.accent === true} data-band={badge.band}>
-                  {badge.value}
-                </span>
-                <span className="dsh_mr_badgeLabel">{badge.label}</span>
-              </div>
-            ))}
-          </div>
+          <TierBadges tier={tier} t={t} />
 
-          <div className="dsh_mr_card">
-            <div className="dsh_mr_cardHead">
-              <span className="dsh_mr_cardTitle">{t('line.title')}</span>
-              <select
-                className="dsh_mr_select"
-                value={tierKey ?? ''}
-                onChange={(event) => selectTier(event.target.value)}
-                aria-label={t('line.title')}
-              >
-                {tierKey === null && <option value="">—</option>}
-                {view.tiers.map((candidate) => (
-                  <option key={candidate.key} value={candidate.key}>
-                    {tierOptionLabel(candidate)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {matchHint !== null && <div className="dsh_mr_hint">{matchHint}</div>}
-            {seriesPoints.length >= 2 ? (
-              <TrendTabs points={seriesPoints} t={t} />
-            ) : (
-              <div className="dsh_mr_empty">{t('empty.noSeries')}</div>
-            )}
-          </div>
+          <TrendCard
+            tiers={view.tiers}
+            value={tierKey ?? ''}
+            onChange={selectTier}
+            hint={matchHint}
+            points={seriesPoints}
+            t={t}
+          />
 
-          <div className="dsh_mr_card">
-            <span className="dsh_mr_cardTitle">
-              {fmt(t('bar.title'), { label: view.scoreLabel || (tier?.passRate != null ? pctText(tier.passRate) : '') })}
-            </span>
-            {taskRows.length > 0 ? (
-              <TaskBars rows={taskRows} benchmark={view.benchmark} scoringMode={view.scoringMode} t={t} />
-            ) : (
-              <div className="dsh_mr_empty">{t('empty.none')}</div>
-            )}
-          </div>
+          <TaskCard view={view} tierKey={tierKey} t={t} />
 
           <CostScatterCard view={view} t={t} />
 

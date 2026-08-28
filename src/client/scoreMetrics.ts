@@ -120,3 +120,22 @@ export function sliceRecentPoints(points: Array<[string, number]>, hours: number
     return !Number.isNaN(time) && time >= cutoff
   })
 }
+
+/**
+ * Direction glyph and signed text for one trend delta — the shared
+ * presentation of a summary's direction (↑/↓/→), the ±0.25 dead-zone read
+ * ('±0.0'), and the sign rule. Trusts the caller's direction: deciding flat
+ * vs up/down is the summaries' job (directionOf), formatting is this one's.
+ */
+export function deltaSignal({
+  direction,
+  delta,
+}: {
+  direction: TrendDirection
+  delta: number
+}): { glyph: string; text: string } {
+  return {
+    glyph: direction === 'up' ? '↑' : direction === 'down' ? '↓' : '→',
+    text: direction === 'flat' ? '±0.0' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`,
+  }
+}

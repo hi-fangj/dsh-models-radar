@@ -12,7 +12,7 @@ import type { RadarTier, RadarView } from '../contract.ts'
 import type { ModelRadarKey } from './locales.ts'
 import { PersistentScrollFrame } from './ScrollFrame.tsx'
 import { harnessMeta, harnessOfModel } from './harness.ts'
-import { iqBand, iqProgress, trendSummary } from './scoreMetrics.ts'
+import { deltaSignal, iqBand, iqProgress, trendSummary } from './scoreMetrics.ts'
 
 interface OverviewProps {
   view: RadarView
@@ -54,14 +54,10 @@ function basesHidingSelection(groups: BaseGroup[], selectedKey: string | null): 
 function DeltaBadge({ points }: { points: Array<[string, number]> | undefined }) {
   const summary = trendSummary(points ?? [])
   if (summary === null) return <span className="dsh_mr_ovDelta" data-dir="none">—</span>
-  const glyph = summary.direction === 'up' ? '↑' : summary.direction === 'down' ? '↓' : '→'
-  const text =
-    summary.direction === 'flat'
-      ? '±0.0'
-      : `${summary.delta24h > 0 ? '+' : ''}${summary.delta24h.toFixed(1)}`
+  const delta = deltaSignal({ direction: summary.direction, delta: summary.delta24h })
   return (
     <span className="dsh_mr_ovDelta" data-dir={summary.direction} title="24h">
-      {glyph} {text}
+      {delta.glyph} {delta.text}
     </span>
   )
 }

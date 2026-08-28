@@ -210,13 +210,17 @@ export const cssText = `
   right: 0;
   min-height: 28px;
   border-radius: 4px;
-  background: var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-scrollbar-bg-l1);
   cursor: grab;
   touch-action: none;
 }
+/* The thumb follows the system scrollbar palette (gray, slightly darker on
+   hover/drag) — never the brand token, which is near-black in the light
+   theme and read as a black bar while scrolling. */
 .dsh_mr_scrollThumb:hover,
-.dsh_mr_scrollThumb:focus-visible {
-  background: var(--dsw-alias-brand-primary);
+.dsh_mr_scrollThumb:focus-visible,
+.dsh_mr_scrollThumb:active {
+  background: var(--dsw-alias-scrollbar-hover-l1);
   outline: none;
 }
 .dsh_mr_scrollThumb:active { cursor: grabbing; }
@@ -246,7 +250,13 @@ export const cssText = `
   transform: scaleY(0.4);
   transition: opacity 120ms ease, transform 120ms ease;
 }
-.dsh_mr_ovRow:hover { background: var(--dsw-alias-bg-layer-2); }
+/* Hover uses the shell's interactive token, not the layer ladder: layer-2 is
+   DARKER than the card in the dark theme (rows would blacken under the cursor
+   while scrolling), whereas interactive-bg-hover is the system gray-brighten
+   overlay (white 8% on dark, subtle tint on light) shared with shell lists.
+   The persistent [data-group-selected]/[data-selected] rules below keep
+   precedence via source order. */
+.dsh_mr_ovRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .dsh_mr_ovRow[data-group-selected="true"] {
   background: var(--dsw-alias-bg-layer-2);
 }
@@ -758,11 +768,6 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.dsh_mr_popoverChannel {
-  flex: none;
-  font-size: 11px;
-  color: var(--dsw-alias-label-secondary);
 }
 .dsh_mr_popoverBody {
   display: flex;

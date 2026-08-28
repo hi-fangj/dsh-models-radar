@@ -18,14 +18,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { createPortal } from 'react-dom'
 import type { PropsLocale, PropsRuntime, InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
-import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
-import type { RadarPayload, RadarTier, RadarView } from '../contract.ts'
+import type { RadarPayload, RadarView } from '../contract.ts'
 import { SOURCE_SITE_URL } from '../contract.ts'
-import { bandColor, iqBand, trendSummary } from './scoreMetrics.ts'
-import { moneyText, minutesText, pctText } from './format.ts'
-import { TaskBars, TrendTabs } from './charts.tsx'
+import { bandColor, deltaSignal, iqBand, trendSummary } from './scoreMetrics.ts'
+import { matchTier } from './tierMatch.ts'
 import { TierOverview } from './Overview.tsx'
-import { tierOptionLabel } from './harness.ts'
+import { TaskCard, TierBadges, TrendCard } from './TierDetail.tsx'
 import { fmt } from './locales.ts'
 
 /** Dock polling period: matches the host's shortest freshness window (15 min, host-side FRESH_EFFICIENCY_MS). */
@@ -46,38 +44,11 @@ export type LiveCapabilityProps = PropsRuntime<'conversation.composer.dock'> &
   InjectFace<LiveCapabilityInjected> &
   PropsLocale<'model-radar'>
 
-interface TierMatch {
-  tier: RadarTier
-  approximate: boolean
-}
-
 /** Anchor geometry snapshot in viewport coordinates. */
 interface AnchorRect {
   left: number
   top: number
   width: number
-}
-
-function normalizeModel(model: string): string {
-  return model.split('/').pop()?.trim().toLowerCase() ?? model.toLowerCase()
-}
-
-function matchTier(view: RadarView, selection: ModelSelection): TierMatch | null {
-  const model = normalizeModel(selection.model)
-  const effort = selection.reasoningEffort?.toLowerCase()
-  if (effort !== undefined) {
-    const exact = view.tiers.find(
-      (tier) => normalizeModel(tier.model) === model && tier.effort.toLowerCase() === effort,
-    )
-    if (exact !== undefined) return { tier: exact, approximate: false }
-  }
-  // `view.tiers` is IQ-descending, so the first base-model hit is its best tier.
-  const base = view.tiers.find((tier) => normalizeModel(tier.model) === model)
-  if (base !== undefined) return { tier: base, approximate: true }
-  const fuzzy = view.tiers.find(
-    (tier) => normalizeModel(tier.model).includes(model) || model.includes(normalizeModel(tier.model)),
-  )
-  return fuzzy === undefined ? null : { tier: fuzzy, approximate: true }
 }
 
 export function LiveCapability({ useSession, modelDirectories, loadData, t }: LiveCapabilityProps) {
@@ -191,14 +162,6 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
     setViewTierKey(null)
   }, [match?.tier.key])
 
-  // Grouped options for the trend card's tier selector (settings-page format).
-  // MUST stay above the early-return guard below: hooks run unconditionally,
-  // or React's render-count invariant kills the whole dock subtree.
-  const tierOptions = useMemo(
-    () => (view === null ? [] : view.tiers.map((candidate) => ({ key: candidate.key, label: tierOptionLabel(candidate) }))),
-    [view],
-  )
-
   if (view === null || selection === null || match === null) return null
 
   const tier = match.tier
@@ -211,25 +174,14 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
   const capsuleSeries = view.series[tier.key] ?? []
   const capsuleTrend = trendSummary(capsuleSeries)
   const capsuleDirection = capsuleTrend?.direction ?? 'flat'
-  const capsuleDeltaText =
+  // Null trend keeps the legacy `→ —` readout: flat glyph over an em dash.
+  const capsuleDelta =
     capsuleTrend === null
-      ? '—'
-      : capsuleDirection === 'flat'
-        ? '±0.0'
-        : `${capsuleTrend.delta24h > 0 ? '+' : ''}${capsuleTrend.delta24h.toFixed(1)}`
-  const capsuleArrow = capsuleDirection === 'up' ? '↑' : capsuleDirection === 'down' ? '↓' : '→'
+      ? { glyph: '→', text: '—' }
+      : deltaSignal({ direction: capsuleTrend.direction, delta: capsuleTrend.delta24h })
   const displayedIq = `${match.approximate ? '≈' : ''}${tier.iq.toFixed(1)}`
 
   const detailSeries = view.series[detailTier.key] ?? []
-  const detailTaskRows = view.taskRates[detailTier.key] ?? []
-
-  const badges: Array<{ label: string; value: string; accent?: boolean; band?: string }> = [
-    { label: t('badge.iq'), value: detailTier.iq.toFixed(1), accent: true, band: iqBand(detailTier.iq) },
-    { label: t('badge.price'), value: moneyText(detailTier.avgPrice) },
-    { label: t('badge.minutes'), value: minutesText(detailTier.avgMinutes) },
-    { label: t('badge.cache'), value: detailTier.cacheHit != null ? pctText(detailTier.cacheHit) : '—' },
-    { label: t('badge.runs'), value: String(detailTier.runs24h) },
-  ]
 
   const width = Math.min(POPOVER_WIDTH, window.innerWidth - 24)
   const anchorLeft =
@@ -253,7 +205,6 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
                 {viewingSessionTier && match.approximate ? '≈ ' : ''}
                 {detailTier.model} · {detailTier.effort}
               </strong>
-              <span className="dsh_mr_popoverChannel">{view.scoreLabel}</span>
             </header>
             <div className="dsh_mr_popoverBody">
               <TierOverview
@@ -264,53 +215,20 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
                 t={t}
                 scroll={false}
               />
-              <div className="dsh_mr_badges">
-                {badges.map((badge) => (
-                  <div className="dsh_mr_badge" key={badge.label}>
-                    <span className="dsh_mr_badgeVal" data-accent={badge.accent === true} data-band={badge.band}>
-                      {badge.value}
-                    </span>
-                    <span className="dsh_mr_badgeLabel">{badge.label}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="dsh_mr_card">
-                <div className="dsh_mr_cardHead">
-                  <span className="dsh_mr_cardTitle">{t('line.title')}</span>
-                  {/* Same flat tier selector as the settings trend card
-                      (model · harness · effort options, no score). Picking a
-                      tier is temporary viewing — identical to clicking an
-                      overview row: it resets to following the session match
-                      when the match moves or the popover closes. */}
-                  <select
-                    className="dsh_mr_select"
-                    value={detailTier.key}
-                    onChange={(event) => setViewTierKey(event.target.value)}
-                    aria-label={t('line.title')}
-                  >
-                    {tierOptions.map((candidate) => (
-                      <option key={candidate.key} value={candidate.key}>
-                        {candidate.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {detailSeries.length >= 2 ? (
-                  <TrendTabs points={detailSeries} t={t} />
-                ) : (
-                  <div className="dsh_mr_empty">{t('empty.noSeries')}</div>
-                )}
-              </div>
-              <div className="dsh_mr_card">
-                <span className="dsh_mr_cardTitle">
-                  {fmt(t('bar.title'), { label: view.scoreLabel })}
-                </span>
-                {detailTaskRows.length > 0 ? (
-                  <TaskBars rows={detailTaskRows} benchmark={view.benchmark} scoringMode={view.scoringMode} t={t} scroll={false} />
-                ) : (
-                  <div className="dsh_mr_empty">{t('empty.none')}</div>
-                )}
-              </div>
+              <TierBadges tier={detailTier} t={t} />
+              {/* Same flat tier selector as the settings trend card (model ·
+                  harness · effort options, no score). Picking a tier is
+                  temporary viewing — identical to clicking an overview row: it
+                  resets to following the session match when the match moves or
+                  the popover closes. */}
+              <TrendCard
+                tiers={view.tiers}
+                value={detailTier.key}
+                onChange={setViewTierKey}
+                points={detailSeries}
+                t={t}
+              />
+              <TaskCard view={view} tierKey={detailTier.key} t={t} scroll={false} />
             </div>
             <footer className="dsh_mr_popoverFooter">
               {fmt(t('updated'), { time: new Date(view.fetchedAt).toLocaleString() })}
@@ -345,7 +263,7 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
         >
           {displayedIq}
         </strong>
-        <span className="dsh_mr_liveDelta" data-dir={capsuleDirection}>{capsuleArrow} {capsuleDeltaText}</span>
+        <span className="dsh_mr_liveDelta" data-dir={capsuleDirection}>{capsuleDelta.glyph} {capsuleDelta.text}</span>
       </button>
       {popover}
     </>

@@ -4,18 +4,14 @@ import type { MouseEvent } from 'react'
 import type { ModelRadarKey } from './locales.ts'
 import { fmt } from './locales.ts'
 import { PersistentScrollFrame } from './ScrollFrame.tsx'
-import { bandColor, iqBand, sliceRecentPoints, windowSummary } from './scoreMetrics.ts'
+import { bandColor, deltaSignal, iqBand, sliceRecentPoints, windowSummary } from './scoreMetrics.ts'
 import type { IqBand } from './scoreMetrics.ts'
+import { AXIS_STYLE, HGrid, PLOT_H, PLOT_W, PlotTip, viewBoxX } from './plotFrame.tsx'
+import { BAND_BOUNDARIES, buildSegments, fitRange } from './plotGeometry.ts'
 import { diagnoseTasks, taskMode, visibleOf } from './taskMetrics.ts'
 import type { TaskFilter, TaskRow } from './taskMetrics.ts'
 
-const TREND_W = 640
-const TREND_H = 190
 const PAD = { top: 16, right: 14, bottom: 26, left: 46 }
-const AXIS_STYLE = { fontSize: 10.5, fill: 'var(--dsw-alias-label-secondary)' } as const
-
-/** Capability-band boundaries drawn as reference lines; see CONTEXT.md. */
-const BAND_BOUNDARIES = [70, 85, 95, 100]
 
 /** Band display names (tooltip), keyed into the model-radar locale namespace. */
 const BAND_LABEL: Record<IqBand, ModelRadarKey> = {
@@ -41,54 +37,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
-/** One painted polyline piece: a band color plus an SVG path and its x extent. */
-interface PaintedPiece {
-  color: string
-  path: string
-  x0: number
-  x1: number
-}
-
-/**
- * Split a trend into capability-band-colored polylines. Adjacent sample
- * points in the same band merge into one path; a segment crossing a band
- * boundary is split exactly at the boundary IQ (linear interpolation), with
- * the boundary point itself belonging to the upper band.
- */
-function buildSegments(values: number[], x: (index: number) => number, y: (value: number) => number): PaintedPiece[] {
-  const pieces: Array<{ color: string; d: string[]; x0: number; x1: number }> = []
-  const add = (color: string, point: [number, number]): void => {
-    const last = pieces[pieces.length - 1]
-    if (last !== undefined && last.color === color) {
-      last.d.push(`L ${point[0].toFixed(1)} ${point[1].toFixed(1)}`)
-      last.x1 = point[0]
-    } else {
-      pieces.push({ color, d: [`M ${point[0].toFixed(1)} ${point[1].toFixed(1)}`], x0: point[0], x1: point[0] })
-    }
-  }
-  for (let i = 0; i < values.length - 1; i++) {
-    const v0 = values[i]
-    const v1 = values[i + 1]
-    let from: [number, number] = [x(i), y(v0)]
-    let band = iqBand(v0)
-    const crossings = BAND_BOUNDARIES.filter(
-      (boundary) => boundary > Math.min(v0, v1) && boundary < Math.max(v0, v1),
-    )
-    if (v1 < v0) crossings.reverse()
-    for (const boundary of crossings) {
-      const ratio = (boundary - v0) / (v1 - v0)
-      const point: [number, number] = [x(i) + (x(i + 1) - x(i)) * ratio, y(boundary)]
-      add(bandColor(band), from)
-      add(bandColor(band), point)
-      from = point
-      band = iqBand(boundary)
-    }
-    add(bandColor(band), from)
-    add(bandColor(band), [x(i + 1), y(v1)])
-  }
-  return pieces.map(({ color, d, x0, x1 }) => ({ color, path: d.join(' '), x0, x1 }))
-}
-
 /**
  * One time-window trend panel: captioned chart with its own symmetric stats
  * row (net change / low / average / high over this window). Fewer than two
@@ -111,21 +59,9 @@ export function TrendPanel({
 
   const geometry = useMemo(() => {
     if (points.length < 2) return null
-    let min = Number.POSITIVE_INFINITY
-    let max = Number.NEGATIVE_INFINITY
-    for (const [, value] of points) {
-      if (value < min) min = value
-      if (value > max) max = value
-    }
-    if (min === max) {
-      min -= 0.5
-      max += 0.5
-    }
-    const slack = (max - min) * 0.08
-    const lo = min - slack
-    const hi = max + slack
-    const innerW = TREND_W - PAD.left - PAD.right
-    const innerH = TREND_H - PAD.top - PAD.bottom
+    const { lo, hi } = fitRange(points.map(([, value]) => value))
+    const innerW = PLOT_W - PAD.left - PAD.right
+    const innerH = PLOT_H - PAD.top - PAD.bottom
     const x = (index: number): number => PAD.left + (index / (points.length - 1)) * innerW
     const y = (value: number): number => PAD.top + (1 - (value - lo) / (hi - lo)) * innerH
     return {
@@ -134,10 +70,10 @@ export function TrendPanel({
       x,
       y,
       last: points.length - 1,
-      baseline: TREND_H - PAD.bottom,
+      baseline: PLOT_H - PAD.bottom,
       segments: buildSegments(points.map(([, value]) => value), x, y),
       bandLines: BAND_BOUNDARIES.map((boundary) => ({ boundary, py: y(boundary) }))
-        .filter(({ py }) => py >= PAD.top - 0.5 && py <= TREND_H - PAD.bottom + 0.5),
+        .filter(({ py }) => py >= PAD.top - 0.5 && py <= PLOT_H - PAD.bottom + 0.5),
     }
   }, [points])
 
@@ -154,10 +90,7 @@ export function TrendPanel({
   const { lo, hi, x, y, last, baseline, segments, bandLines } = geometry
   const mid = (lo + hi) / 2
   const hovered = hoverIndex !== null ? points[hoverIndex] : undefined
-  const changeText =
-    summary.direction === 'flat'
-      ? '±0.0'
-      : `${summary.change > 0 ? '+' : ''}${summary.change.toFixed(1)}`
+  const changeText = deltaSignal({ direction: summary.direction, delta: summary.change }).text
   // The endpoint and hover markers carry the capability band color: the
   // momentum semantics live in the delta badge and trend stats instead.
   const endpointColor = bandColor(iqBand(points[last][1]))
@@ -176,27 +109,23 @@ export function TrendPanel({
       </div>
       <div className="dsh_mr_trendWrap">
         <svg
-          viewBox={`0 0 ${TREND_W} ${TREND_H}`}
+          viewBox={`0 0 ${PLOT_W} ${PLOT_H}`}
           role="img"
           aria-label={`${title} · IQ trend`}
           onMouseMove={(event: MouseEvent<SVGSVGElement>) => {
-            const rect = event.currentTarget.getBoundingClientRect()
-            const relX = ((event.clientX - rect.left) / rect.width) * TREND_W
-            const ratio = (relX - PAD.left) / (TREND_W - PAD.left - PAD.right)
+            const relX = viewBoxX(event, PLOT_W)
+            const ratio = (relX - PAD.left) / (PLOT_W - PAD.left - PAD.right)
             setHoverIndex(clamp(Math.round(ratio * (points.length - 1)), 0, points.length - 1))
           }}
           onMouseLeave={() => setHoverIndex(null)}
         >
           {[hi, mid, lo].map((value) => (
-            <g key={value}>
-              <line x1={PAD.left} x2={TREND_W - PAD.right} y1={y(value)} y2={y(value)} stroke="var(--dsw-alias-border-l1)" strokeDasharray={value === mid ? 'none' : '3 4'} />
-              <text x={PAD.left - 6} y={y(value) + 3.5} textAnchor="end" style={AXIS_STYLE}>{value.toFixed(1)}</text>
-            </g>
+            <HGrid key={value} y={y(value)} x1={PAD.left} x2={PLOT_W - PAD.right} label={value.toFixed(1)} dash={value === mid ? 'none' : '3 4'} />
           ))}
           {bandLines.map(({ boundary, py }) => (
             <g key={boundary}>
-              <line x1={PAD.left} x2={TREND_W - PAD.right} y1={py} y2={py} stroke="var(--dsw-alias-border-l2)" strokeDasharray="2 4" />
-              <text x={TREND_W - PAD.right + 6} y={py + 3.5} textAnchor="start" style={{ ...AXIS_STYLE, fontSize: 9 }}>{boundary}</text>
+              <line x1={PAD.left} x2={PLOT_W - PAD.right} y1={py} y2={py} stroke="var(--dsw-alias-border-l2)" strokeDasharray="2 4" />
+              <text x={PLOT_W - PAD.right + 6} y={py + 3.5} textAnchor="start" style={{ ...AXIS_STYLE, fontSize: 9 }}>{boundary}</text>
             </g>
           ))}
           {segments.map((segment, index) => (
@@ -211,19 +140,19 @@ export function TrendPanel({
           ))}
           {hovered !== undefined && hoverIndex !== null && (
             <>
-              <line x1={x(hoverIndex)} x2={x(hoverIndex)} y1={PAD.top} y2={TREND_H - PAD.bottom} stroke="var(--dsw-alias-border-l2)" />
+              <line x1={x(hoverIndex)} x2={x(hoverIndex)} y1={PAD.top} y2={PLOT_H - PAD.bottom} stroke="var(--dsw-alias-border-l2)" />
               <circle cx={x(hoverIndex)} cy={y(hovered[1])} r="3" fill="var(--dsw-alias-bg-layer-1)" stroke={bandColor(iqBand(hovered[1]))} strokeWidth="2" />
             </>
           )}
           <circle cx={x(last)} cy={y(points[last][1])} r="3.8" fill={endpointColor} />
           <text x={x(last)} y={y(points[last][1]) - 9} textAnchor="end" style={{ ...AXIS_STYLE, fontWeight: 600, fill: 'var(--dsw-alias-label-primary)' }}>{points[last][1].toFixed(1)}</text>
-          <text x={PAD.left} y={TREND_H - 8} style={AXIS_STYLE}>{formatStamp(points[0][0], false)}</text>
-          <text x={TREND_W - PAD.right} y={TREND_H - 8} textAnchor="end" style={AXIS_STYLE}>{formatStamp(points[last][0], false)}</text>
+          <text x={PAD.left} y={PLOT_H - 8} style={AXIS_STYLE}>{formatStamp(points[0][0], false)}</text>
+          <text x={PLOT_W - PAD.right} y={PLOT_H - 8} textAnchor="end" style={AXIS_STYLE}>{formatStamp(points[last][0], false)}</text>
         </svg>
         {hovered !== undefined && hoverIndex !== null && (
-          <div className="dsh_mr_tip" style={{ left: `${(x(hoverIndex) / TREND_W) * 100}%`, top: `${(y(hovered[1]) / TREND_H) * 100}%` }}>
+          <PlotTip x={x(hoverIndex)} y={y(hovered[1])} width={PLOT_W} height={PLOT_H}>
             {formatStamp(hovered[0], true)} · {hovered[1].toFixed(1)} {t(BAND_LABEL[iqBand(hovered[1])])}
-          </div>
+          </PlotTip>
         )}
       </div>
     </section>
@@ -285,6 +214,9 @@ const FILTER_KEYS: Record<TaskFilter, ModelRadarKey> = {
   excellent: 'task.filter.excellent', good: 'task.filter.good', general: 'task.filter.general', low: 'task.filter.low',
 }
 
+/** Rows shown before the list collapses behind the expand toggle (popover context). */
+const COLLAPSED_ROW_COUNT = 8
+
 /**
  * The task-composition card: aggregate stacked bar, category filter buttons,
  * and the sorted per-task bars. All classification, counting, ordering and
@@ -297,6 +229,7 @@ export function TaskBars({
   scoringMode,
   t,
   scroll = true,
+  collapsible = false,
 }: {
   rows: TaskRow[]
   benchmark: string
@@ -304,6 +237,8 @@ export function TaskBars({
   t: Translate
   /** Wrap the list in the persistent scroll frame; false lets the parent viewport own scrolling. */
   scroll?: boolean
+  /** Cap the list at COLLAPSED_ROW_COUNT rows behind an expand toggle; the settings scroll frame never needs it. */
+  collapsible?: boolean
 }) {
   const mode = taskMode(benchmark, scoringMode)
   const [filter, setFilter] = useState<TaskFilter>('all')
@@ -321,10 +256,16 @@ export function TaskBars({
         })
       : fmt(t('task.summary.average'), { rate: `${diagnostics.summary.rate}%` })
   const visible = visibleOf(diagnostics, filter)
+  // Default-collapsed: show the head rows only until expanded; data or filter
+  // changes return the list to that default so a stale expand never resurfaces.
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => setExpanded(false), [rows, filter])
+  const collapsed = collapsible && !expanded && visible.length > COLLAPSED_ROW_COUNT
+  const shown = collapsed ? visible.slice(0, COLLAPSED_ROW_COUNT) : visible
 
   const bars = (
     <div className="dsh_mr_bars">
-      {visible.map(({ row: [taskId, rate], category }) => (
+      {shown.map(({ row: [taskId, rate], category }) => (
         <div className="dsh_mr_barRow" key={taskId}>
           <span className="dsh_mr_barLabel" title={taskId}>{taskId}</span>
           <div className="dsh_mr_barTrack">
@@ -359,6 +300,11 @@ export function TaskBars({
         </PersistentScrollFrame>
       ) : (
         bars
+      )}
+      {collapsible && visible.length > COLLAPSED_ROW_COUNT && (
+        <button type="button" className="dsh_mr_more" onClick={() => setExpanded((value) => !value)}>
+          {collapsed ? fmt(t('task.expand'), { count: String(visible.length) }) : t('task.collapse')}
+        </button>
       )}
     </>
   )
