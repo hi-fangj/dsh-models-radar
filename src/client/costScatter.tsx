@@ -11,8 +11,17 @@
  */
 import { useMemo, useState } from 'react'
 import type { CSSProperties, MouseEvent } from 'react'
-import type { RadarTier, RadarView } from '../contract.ts'
+import type { RadarView } from '../contract.ts'
 import type { ModelRadarKey } from './locales.ts'
+import {
+  buildCostDataset,
+  DEFAULT_HIDDEN_BASES,
+  EFFORT_ORDER,
+  listBases,
+  type CostMetric,
+  type CostLadder,
+  type ScatterPoint,
+} from './costMetrics.ts'
 
 /** Site-canonical per-base palette (its MODEL_COLORS table, verbatim). */
 const MODEL_COLORS: Record<string, string> = {
@@ -34,21 +43,6 @@ const MODEL_COLORS: Record<string, string> = {
 function modelColor(base: string): string {
   return MODEL_COLORS[base] ?? 'var(--dsw-alias-label-secondary)'
 }
-
-/** ln(2.5)/ln(1.35): the site's "2.5× price buys 1.35× speed" exponent. */
-const COMBINED_SPEED_WEIGHT = Math.log(2.5) / Math.log(1.35)
-
-/** Site's combinedEfficiencyIndex; null when either input is missing. */
-export function combinedCostIndex(price: number | null, minutes: number | null): number | null {
-  if (price === null || minutes === null || !(price > 0) || !(minutes > 0)) return null
-  return price * Math.pow(minutes / 10, COMBINED_SPEED_WEIGHT) * 100
-}
-
-/** The site ships these codex-run DSV4 tiers hidden: same base models as the dsh- variants. */
-const DEFAULT_HIDDEN_BASES = ['deepseek-v4-flash', 'deepseek-v4-pro']
-
-/** Legend order; an unknown effort falls through to the circle. */
-const EFFORT_ORDER = ['off', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']
 
 /** Site's efficiencyShapePath: marker shape per reasoning effort. */
 function effortShapePath(effort: string, cx: number, cy: number, r: number): string {
@@ -117,29 +111,6 @@ const PAD = { top: 14, right: 16, bottom: 26, left: 40 }
 const IQ_MAX = 120
 const AXIS_STYLE = { fontSize: 10.5, fill: 'var(--dsw-alias-label-secondary)' } as const
 
-interface ScatterPoint {
-  tier: RadarTier
-  x: number
-}
-
-/** Same-base ladders: points grouped by model, each sorted by effort strength. */
-function grouped(points: ScatterPoint[]): Map<string, ScatterPoint[]> {
-  const ladders = new Map<string, ScatterPoint[]>()
-  for (const point of points) {
-    const ladder = ladders.get(point.tier.model)
-    if (ladder === undefined) ladders.set(point.tier.model, [point])
-    else ladder.push(point)
-  }
-  for (const ladder of ladders.values()) {
-    ladder.sort(
-      (a, b) =>
-        EFFORT_ORDER.indexOf(a.tier.effort) - EFFORT_ORDER.indexOf(b.tier.effort) ||
-        a.x - b.x,
-    )
-  }
-  return ladders
-}
-
 /**
  * One log-x panel: IQ gridlines, decade ticks, and one shape marker per
  * visible tier. Hovering surfaces the tier's full reading. The caption is
@@ -149,12 +120,14 @@ function CostPanel({
   title,
   metric,
   points,
+  ladders,
   focus,
   t,
 }: {
   title?: string
-  metric: 'combined' | 'minutes' | 'price'
+  metric: CostMetric
   points: ScatterPoint[]
+  ladders: CostLadder[]
   /** Hovered/focused base model, or null; dims every other series. */
   focus: string | null
   t: (key: ModelRadarKey) => string
@@ -231,7 +204,7 @@ function CostPanel({
           {/* Same-base ladder lines beneath the markers, site parity: points
               joined in effort-strength order (off→ultra), round 2.1 stroke at
               0.78 opacity, skipped for single-point bases. */}
-          {[...grouped(points).values()].map((ladder) =>
+          {ladders.map((ladder) =>
             ladder.length > 1 ? (
               <path
                 key={ladder[0].tier.model}
@@ -295,15 +268,17 @@ function readCostMetric(): CostMetric {
  * remembered) so the page stays compact.
  */
 export function CostScatterCard({ view, t }: { view: RadarView; t: (key: ModelRadarKey) => string }) {
-  const bases = useMemo(() => {
-    const seen: string[] = []
-    for (const tier of view.tiers) if (!seen.includes(tier.model)) seen.push(tier.model)
-    return seen
-  }, [view])
   const [hidden, setHidden] = useState<Set<string>>(() => new Set(DEFAULT_HIDDEN_BASES))
   const [metric, setMetric] = useState<CostMetric>(readCostMetric)
   /** Base model whose chip is hovered: the chart focuses its series alone. */
   const [focus, setFocus] = useState<string | null>(null)
+  // Chip row lists every base (hidden ones stay clickable to re-enable);
+  // panels derive from the caller-filtered visible tiers only.
+  const bases = useMemo(() => listBases(view.tiers), [view.tiers])
+  const dataset = useMemo(
+    () => buildCostDataset(view.tiers.filter((tier) => !hidden.has(tier.model))),
+    [view.tiers, hidden],
+  )
 
   const toggle = (base: string): void => {
     setHidden((previous) => {
@@ -323,22 +298,8 @@ export function CostScatterCard({ view, t }: { view: RadarView; t: (key: ModelRa
     setMetric(next)
   }
 
-  const visible = view.tiers.filter((tier) => !hidden.has(tier.model))
-  const pick = (get: (tier: RadarTier) => number | null, normalize = false): ScatterPoint[] => {
-    const rows = visible.flatMap((tier) => {
-      const value = get(tier)
-      return value !== null && value > 0 ? [{ tier, x: value }] : []
-    })
-    if (normalize && rows.length > 0) {
-      const max = Math.max(...rows.map((row) => row.x))
-      return rows.map((row) => ({ tier: row.tier, x: (row.x / max) * 100 }))
-    }
-    return rows
-  }
-  const combined = pick((tier) => combinedCostIndex(tier.avgPrice, tier.avgMinutes), true)
-  const minutes = pick((tier) => tier.avgMinutes)
-  const price = pick((tier) => tier.avgPrice)
-  const TAB_POINTS: Record<CostMetric, ScatterPoint[]> = { combined, minutes, price }
+  const points = dataset.points[metric]
+  const ladders = dataset.ladders[metric]
 
   return (
     <div className="dsh_mr_card">
@@ -396,7 +357,7 @@ export function CostScatterCard({ view, t }: { view: RadarView; t: (key: ModelRa
             </button>
           ))}
         </div>
-        <CostPanel metric={metric} points={TAB_POINTS[metric]} focus={focus} t={t} />
+        <CostPanel metric={metric} points={points} ladders={ladders} focus={focus} t={t} />
       </div>
     </div>
   )

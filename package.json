@@ -46,7 +46,8 @@
     "docs"
   ],
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "test:cost": "node --experimental-strip-types scripts/test-cost-metrics.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
