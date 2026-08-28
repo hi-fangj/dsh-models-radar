@@ -6,6 +6,8 @@ import { fmt } from './locales.ts'
 import { PersistentScrollFrame } from './ScrollFrame.tsx'
 import { bandColor, iqBand, sliceRecentPoints, windowSummary } from './scoreMetrics.ts'
 import type { IqBand } from './scoreMetrics.ts'
+import { diagnoseTasks, taskMode, visibleOf } from './taskMetrics.ts'
+import type { TaskFilter, TaskRow } from './taskMetrics.ts'
 
 const TREND_W = 640
 const TREND_H = 190
@@ -25,9 +27,6 @@ const BAND_LABEL: Record<IqBand, ModelRadarKey> = {
 }
 
 type Translate = (key: ModelRadarKey) => string
-type TaskRow = [string, number, boolean?]
-type TaskCategory = 'pass' | 'split' | 'fail' | 'excellent' | 'good' | 'general' | 'low'
-type TaskMode = 'binary' | 'continuous'
 
 const two = (n: number): string => (n < 10 ? `0${n}` : String(n))
 
@@ -280,28 +279,18 @@ export function TrendTabs({ points, t }: { points: Array<[string, number]>; t: T
   )
 }
 
-function taskMode(benchmark: string, scoringMode?: string): TaskMode {
-  return benchmark === 'deep-swe' || scoringMode === 'binary-majority' ? 'binary' : 'continuous'
-}
-
-function taskCategory(row: TaskRow, mode: TaskMode): TaskCategory {
-  const [, rate, majorityPassed] = row
-  if (mode === 'binary') {
-    if (majorityPassed === true || (majorityPassed === undefined && rate >= 2 / 3)) return 'pass'
-    if (rate > 0) return 'split'
-    return 'fail'
-  }
-  if (rate >= 0.75) return 'excellent'
-  if (rate >= 0.5) return 'good'
-  if (rate >= 0.25) return 'general'
-  return 'low'
-}
-
-const FILTER_KEYS: Record<TaskCategory | 'all', ModelRadarKey> = {
+/** Filter-button labels keyed by TaskFilter (locale namespace); order comes from the diagnostics. */
+const FILTER_KEYS: Record<TaskFilter, ModelRadarKey> = {
   all: 'task.filter.all', pass: 'task.filter.pass', split: 'task.filter.split', fail: 'task.filter.fail',
   excellent: 'task.filter.excellent', good: 'task.filter.good', general: 'task.filter.general', low: 'task.filter.low',
 }
 
+/**
+ * The task-composition card: aggregate stacked bar, category filter buttons,
+ * and the sorted per-task bars. All classification, counting, ordering and
+ * summary derivation lives in taskMetrics.ts; this component owns only the
+ * filter state, locale text, and presentation.
+ */
 export function TaskBars({
   rows,
   benchmark,
@@ -317,21 +306,21 @@ export function TaskBars({
   scroll?: boolean
 }) {
   const mode = taskMode(benchmark, scoringMode)
-  const categories: TaskCategory[] = mode === 'binary' ? ['pass', 'split', 'fail'] : ['excellent', 'good', 'general', 'low']
-  const [filter, setFilter] = useState<TaskCategory | 'all'>('all')
+  const [filter, setFilter] = useState<TaskFilter>('all')
   useEffect(() => setFilter('all'), [mode])
-
-  const enriched = rows
-    .map((row) => ({ row, category: taskCategory(row, mode) }))
-    .sort((a, b) => a.row[1] - b.row[1] || a.row[0].localeCompare(b.row[0]))
-  const counts = Object.fromEntries(categories.map((category) => [category, enriched.filter((item) => item.category === category).length])) as Record<TaskCategory, number>
-  const visible = filter === 'all' ? enriched : enriched.filter((item) => item.category === filter)
-  const average = rows.length === 0 ? 0 : rows.reduce((sum, row) => sum + row[1], 0) / rows.length
-  const passed = counts.pass ?? 0
+  // The scan+sort depends only on rows+mode; a filter click just swaps the
+  // O(1) bucket reference (visibleOf), never recomputes this.
+  const diagnostics = useMemo(() => diagnoseTasks(rows, mode), [rows, mode])
+  const total = rows.length
   const summary =
-    mode === 'binary'
-      ? fmt(t('task.summary.pass'), { passed: String(passed), total: String(rows.length), rate: `${Math.round((passed / Math.max(1, rows.length)) * 100)}%` })
-      : fmt(t('task.summary.average'), { rate: `${Math.round(average * 100)}%` })
+    diagnostics.mode === 'binary'
+      ? fmt(t('task.summary.pass'), {
+          passed: String(diagnostics.summary.passed),
+          total: String(diagnostics.summary.total),
+          rate: `${diagnostics.summary.rate}%`,
+        })
+      : fmt(t('task.summary.average'), { rate: `${diagnostics.summary.rate}%` })
+  const visible = visibleOf(diagnostics, filter)
 
   const bars = (
     <div className="dsh_mr_bars">
@@ -350,22 +339,19 @@ export function TaskBars({
   return (
     <>
       <div className="dsh_mr_taskSummary">
-        <div className="dsh_mr_taskSummaryHead"><strong>{summary}</strong><span>{rows.length}</span></div>
+        <div className="dsh_mr_taskSummaryHead"><strong>{summary}</strong><span>{total}</span></div>
         <div className="dsh_mr_taskAggregate" role="img" aria-label={summary}>
-          {categories.map((category) => (
-            <span key={category} data-band={category} style={{ width: `${(counts[category] / Math.max(1, rows.length)) * 100}%` }} />
+          {diagnostics.counts.map(({ category, count }) => (
+            <span key={category} data-band={category} style={{ width: `${(count / Math.max(1, total)) * 100}%` }} />
           ))}
         </div>
       </div>
       <div className="dsh_mr_taskFilters">
-        {(['all', ...categories] as Array<TaskCategory | 'all'>).map((category) => {
-          const count = category === 'all' ? rows.length : counts[category]
-          return (
-            <button key={category} type="button" data-active={filter === category} data-band={category} onClick={() => setFilter(category)}>
-              {t(FILTER_KEYS[category])} <span>{count}</span>
-            </button>
-          )
-        })}
+        {([{ category: 'all' as TaskFilter, count: total }, ...diagnostics.counts]).map(({ category, count }) => (
+          <button key={category} type="button" data-active={filter === category} data-band={category} onClick={() => setFilter(category)}>
+            {t(FILTER_KEYS[category])} <span>{count}</span>
+          </button>
+        ))}
       </div>
       {scroll ? (
         <PersistentScrollFrame viewportClassName="dsh_mr_taskScroll" label={t('bar.title')}>

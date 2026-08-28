@@ -47,9 +47,10 @@
   ],
   "scripts": {
     "build": "node build.mjs",
-    "test": "npm run test:cost && npm run test:store",
+    "test": "npm run test:cost && npm run test:store && npm run test:tasks",
     "test:cost": "node --experimental-strip-types scripts/test-cost-metrics.mjs",
-    "test:store": "node --experimental-strip-types scripts/test-radar-store.mjs"
+    "test:store": "node --experimental-strip-types scripts/test-radar-store.mjs",
+    "test:tasks": "node --experimental-strip-types scripts/test-task-metrics.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
