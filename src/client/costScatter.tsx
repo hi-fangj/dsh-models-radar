@@ -62,7 +62,7 @@ function effortShapePath(effort: string, cx: number, cy: number, r: number): str
   }
   if (effort === 'high') {
     const s = r * 0.82
-    return `M${point(x - s, y - s)} PLOT_H${(x + s).toFixed(1)} V${(y + s).toFixed(1)} PLOT_H${(x - s).toFixed(1)} Z`
+    return `M${point(x - s, y - s)} L${point(x + s, y - s)} L${point(x + s, y + s)} L${point(x - s, y + s)} Z`
   }
   if (effort === 'xhigh') {
     return `M${point(x, y - r)} L${point(x + r, y)} L${point(x, y + r)} L${point(x - r, y)} Z`
