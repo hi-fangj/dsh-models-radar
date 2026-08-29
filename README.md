@@ -42,6 +42,7 @@ A model capability radar plugin for the [DeepSeek Harness](https://github.com/de
 ## Features
 
 - **Settings → Model Radar** page through the additive `settings.section` slot
+- A **Model Radar** card under Settings → Plugins → Configurable plugins through `settings.plugin.item` (the live-readout display switch, persisted in Host settings)
 - **Capability overview** grouped by base model with expandable reasoning-effort tiers and per-row Harness attribution badges
 - Fixed `0–110` IQ scale with consistent capability-band semantics across channels
 - **Trend tabs**: last 24 hours / last 7 days, each independently y-scaled with full stats; the choice persists
@@ -203,6 +204,8 @@ Match order:
 
 Switching models in the composer updates the capsule immediately. The readout polls the host every 15 minutes (the shortest freshness window) — one local request per tick and at most one upstream fetch per channel per window; on failure the last successful value is kept.
 
+Prefer no capsule by the composer? The「Show live capability readout」switch on the **Model Radar** card under **Settings → Plugins → Configurable plugins** hides it entirely; while hidden the capsule renders nothing and stops background polling. The preference persists in Host settings (shared across browsers, immune to clearing browser storage; a legacy localStorage choice is migrated once on upgrade).
+
 ## Update
 
 ```bash
@@ -266,14 +269,17 @@ Snapshot directory:
 ```text
 Browser
   ├── settings.section → Model Radar page
+  ├── settings.plugin.item → plugin-configuration card (live-readout display switch)
   ├── conversation.composer.dock → session capability capsule + popover
-  └── GET /model-radar/api/data
+  ├── GET /model-radar/api/data
+  └── GET/POST /model-radar/api/pref
             │
             ▼
 Host plugin
   ├── per-dataset freshness windows (efficiency/tasks 15 min, channels/trend 60 min)
   ├── single-flight upstream requests + channel-global benchmarks cache
   ├── normalization into RadarView
+  ├── settings namespace dsh-models-radar (live-readout preference, persisted in Host settings)
   └── local snapshot persistence (served within its window across restarts)
 ```
 

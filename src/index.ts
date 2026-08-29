@@ -4,7 +4,9 @@
  * (src/store.ts). This file is deliberately a thin HTTP adapter: route
  * matching, benchmark-id validation, bypass parsing, the codexradar upstream
  * adapter (URLs + fetch), the filesystem snapshot adapter, and the
- * default-model service read. Freshness windows, single-flight, fallback and
+ * default-model service read. The settings namespace `dsh-models-radar` (the
+ * composer-dock display preference) is registered here too and edited over the
+ * same-origin pref routes. Freshness windows, single-flight, fallback and
  * snapshot-commit ordering all live in the store.
  *
  * Why a host proxy at all — api.codexradar.com's CORS policy is an origin
@@ -21,18 +23,49 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import type { RadarView } from './contract.ts'
 import { createRadarDataStore, type DatasetKind, type RadarUpstream, type SnapshotStore } from './store.ts'
 
 /** Cordis plugin name (the Loader entry and client bundle id). */
 export const name = 'dsh-models-radar'
 
-/** Services required before load: only the browser HTTP carrier. */
-export const inject = ['webServer']
+/** Services required before load: the browser HTTP carrier and the settings capability. */
+export const inject = ['webServer', 'settings']
 
 const UPSTREAM = 'https://api.codexradar.com/api/v1'
 const ROUTE_PREFIX = '/model-radar'
 const FETCH_TIMEOUT_MS = 30_000
+
+/**
+ * Settings namespace serving the composer-dock display preference. The value
+ * must stay a lowercase kebab string (the dsh-settings namespace grammar) and
+ * must equal the client pref card's slot key — the Plugins configuration tab
+ * dispatches cards by pairing served namespaces with registered card keys.
+ */
+const RADAR_SETTINGS_NAMESPACE = 'dsh-models-radar'
+
+/** Schema of the namespace: one boolean preference, shown by default. */
+const RADAR_SETTINGS_SCHEMA = z.object({
+  liveVisible: z.boolean().default(true),
+})
+
+/** Cap on the pref write body; one boolean field never needs more. */
+const PREF_BODY_LIMIT_BYTES = 1024
+
+/**
+ * Structural face of the settings service this plugin registers through.
+ * `@deepseek-ai/dsh-settings` is a deployment-internal package with no npm
+ * artifact a workspace install can resolve, so the contract is mirrored
+ * structurally (same shape as SettingsProvider.register's scope) and the
+ * runtime service name `settings` comes from the inject declaration.
+ */
+interface RadarSettingsScope {
+  /** Current resolved namespace value (schema default, then user layer). */
+  get(): { liveVisible: boolean }
+  /** Merge a partial patch into the user layer and persist it. */
+  update(patch: object): Promise<void>
+}
 
 /** Upstream URL per dataset kind — the adapter's schema knowledge. */
 const UPSTREAM_PATHS: Record<DatasetKind, (benchmark: string) => string> = {
@@ -126,6 +159,58 @@ export function apply(ctx: Context): void {
     respond(res, response.ok ? 200 : 502, response)
   }
 
+  /** Read one JSON body with the pref cap; rejects on oversize or broken JSON. */
+  async function readJsonBody(req: import('node:http').IncomingMessage): Promise<unknown> {
+    const chunks: Buffer[] = []
+    let total = 0
+    for await (const chunk of req) {
+      total += (chunk as Buffer).length
+      if (total > PREF_BODY_LIMIT_BYTES) throw new Error('body too large')
+      chunks.push(chunk as Buffer)
+    }
+    return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
+  }
+
+  // Hard dependency: the pref card in the Plugins configuration tab only
+  // dispatches for namespaces the settings service serves, so without it the
+  // display preference has no surface and the plugin has nothing to say.
+  const settings = ctx.get('settings') as
+    | { register(ns: string, schema: unknown, options?: { applies?: 'live' | 'restart' }): RadarSettingsScope }
+    | undefined
+  if (settings === undefined) throw new Error(`[${name}] settings service unavailable`)
+  const prefScope = settings.register(RADAR_SETTINGS_NAMESPACE, RADAR_SETTINGS_SCHEMA, { applies: 'live' })
+
+  /** GET /api/pref: the committed display preference. */
+  function handlePrefGet(res: import('node:http').ServerResponse): void {
+    respond(res, 200, { ok: true, liveVisible: prefScope.get().liveVisible })
+  }
+
+  /** POST /api/pref: validate one boolean field, merge into the user layer, persist. */
+  async function handlePrefPost(
+    req: import('node:http').IncomingMessage,
+    res: import('node:http').ServerResponse,
+  ): Promise<void> {
+    let payload: unknown
+    try {
+      payload = await readJsonBody(req)
+    } catch {
+      respond(res, 400, { ok: false, error: 'invalid JSON body' })
+      return
+    }
+    const value = (payload as { liveVisible?: unknown } | null)?.liveVisible
+    if (typeof value !== 'boolean') {
+      respond(res, 400, { ok: false, error: 'liveVisible must be a boolean' })
+      return
+    }
+    try {
+      await prefScope.update({ liveVisible: value })
+    } catch (cause) {
+      respond(res, 500, { ok: false, error: cause instanceof Error ? cause.message : String(cause) })
+      return
+    }
+    respond(res, 200, { ok: true, liveVisible: prefScope.get().liveVisible })
+  }
+
   ctx.effect(
     () =>
       ctx.webServer.register({
@@ -135,7 +220,11 @@ export function apply(ctx: Context): void {
           void (async () => {
             try {
               const url = new URL(req.url ?? '/', 'http://dsh.local')
-              if (req.method !== 'GET') {
+              if (url.pathname === `${ROUTE_PREFIX}/api/pref`) {
+                if (req.method === 'GET') handlePrefGet(res)
+                else if (req.method === 'POST') await handlePrefPost(req, res)
+                else respond(res, 405, { ok: false, error: 'method not allowed' })
+              } else if (req.method !== 'GET') {
                 respond(res, 405, { ok: false, error: 'method not allowed' })
               } else if (url.pathname === `${ROUTE_PREFIX}/api/data`) {
                 await handleData(url, res)

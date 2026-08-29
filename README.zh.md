@@ -42,6 +42,7 @@
 ## 功能
 
 - 通过 `settings.section` 扩展点增加 **设置 → 模型雷达** 页面
+- 通过 `settings.plugin.item` 扩展点增加 **设置 → 插件 → 可配置插件** 的「模型雷达」卡片（显示会话能力浮窗开关，偏好存 Host 设置）
 - **能力总览**：按基座模型聚合，可展开查看所有推理力度档位，行内 Harness 徽章标注分数出处
 - 使用固定 `0–110` IQ 刻度，跨频道保持一致的能力等级语义
 - **IQ 趋势页签**：近 24 小时 / 近 7 天切换，各窗独立 y 轴缩放与完整统计，选择被记住
@@ -203,6 +204,8 @@ SWE IQ 90.2   ↑ +1.4
 
 在 composer 中切换模型后，胶囊立即更新。读数每 15 分钟（最短新鲜窗口）向 Host 轮询一次，每次仅一次本地请求、每频道每窗口至多一次上游拉取；刷新失败时保留最近一次成功值。
 
+不想在输入框旁看到胶囊？**设置 → 插件 → 可配置插件** 里的「模型雷达」卡片提供「显示会话能力浮窗」开关，可整体隐藏它；关闭期间胶囊不渲染、也不再后台轮询。偏好持久化在 Host 设置（跨浏览器共享、清浏览器缓存不丢失；升级前存在 localStorage 的旧选择会被一次性迁移）。
+
 ## 更新
 
 ```bash
@@ -266,14 +269,17 @@ dev_uninject_plugin({
 ```text
 Browser
   ├── settings.section → 模型雷达页面
+  ├── settings.plugin.item → 插件配置卡片（显示会话能力浮窗开关）
   ├── conversation.composer.dock → 当前 session 能力胶囊 + 能力浮层
-  └── GET /model-radar/api/data
+  ├── GET /model-radar/api/data
+  └── GET/POST /model-radar/api/pref
             │
             ▼
 Host plugin
   ├── 各数据集独立新鲜窗口（效率/任务构成 15 分钟，频道列表/趋势 60 分钟）
   ├── 单飞行上游请求 + 频道全局 benchmarks 缓存
   ├── 归一化为 RadarView
+  ├── settings namespace dsh-models-radar（会话能力浮窗偏好，持久化到 Host 设置）
   └── 本地快照持久化（重启后在窗口内继续服务快照）
 ```
 

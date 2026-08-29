@@ -12,7 +12,8 @@
  * that tier instead, until the session match changes or the popover closes.
  * The popover renders from the readout's already-loaded view — opening costs
  * zero requests — and closes on outside pointerdown, Escape, or when the tier
- * match disappears.
+ * match disappears. The readout can be hidden entirely from the Settings tab
+ * (「显示会话能力浮窗」): hidden means no capsule, no popover and no polling.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
@@ -22,6 +23,7 @@ import type { RadarPayload, RadarView } from '../contract.ts'
 import { SOURCE_SITE_URL } from '../contract.ts'
 import { bandColor, deltaSignal, iqBand, trendSummary } from './scoreMetrics.ts'
 import { matchTier } from './tierMatch.ts'
+import { liveVisibleStore } from './liveVisible.ts'
 import { TierOverview } from './Overview.tsx'
 import { TaskCard, TierBadges, TrendCard } from './TierDetail.tsx'
 import { fmt } from './locales.ts'
@@ -65,12 +67,17 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
   const [viewTierKey, setViewTierKey] = useState<string | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const popoverRef = useRef<HTMLElement | null>(null)
+  /** Settings-tab display preference; false hides the capsule and stops polling. */
+  const liveVisible = useSyncExternalStore(liveVisibleStore.subscribe, liveVisibleStore.get)
 
   useEffect(() => {
     if (directory.store.getSnapshot().current === null) void directory.load().catch(() => undefined)
   }, [directory])
 
   useEffect(() => {
+    // Hidden readout: no polling at all — the settings switch stops all dock
+    // traffic. Re-showing restarts the cycle with an immediate refresh.
+    if (!liveVisible) return
     let cancelled = false
     const controller = new AbortController()
     const refresh = (): void => {
@@ -93,7 +100,7 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
       controller.abort()
       window.clearInterval(timer)
     }
-  }, [loadData, sessionId])
+  }, [loadData, sessionId, liveVisible])
 
   const selection = directoryState.current
   const match = useMemo(
@@ -106,6 +113,12 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
     setAnchor(null)
     setViewTierKey(null)
   }, [])
+
+  // Hiding the readout also tears down any open popover state, so re-showing
+  // never resurrects a stale anchored panel.
+  useEffect(() => {
+    if (!liveVisible) close()
+  }, [liveVisible, close])
 
   const onToggle = (): void => {
     if (open) {
@@ -162,7 +175,7 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
     setViewTierKey(null)
   }, [match?.tier.key])
 
-  if (view === null || selection === null || match === null) return null
+  if (!liveVisible || view === null || selection === null || match === null) return null
 
   const tier = match.tier
   // Detail tier: the temporary overview pick when valid, else the session match.

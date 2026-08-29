@@ -796,6 +796,129 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
 .dsh_mr_dot[data-fresh="true"] { background: var(--dsw-alias-state-success-primary); }
 .dsh_mr_dot[data-fresh="false"] { background: var(--dsw-alias-state-warn-primary); }
 .dsh_mr_footerSpacer { flex: 1 1 auto; }
+/* Plugin-configuration card (设置 → 插件 → 可配置插件), the collapsible
+   disclosure used by ecosystem plugin cards: a full-width header button
+   (name + description + chevron) over a conditionally rendered body. The
+   card owns the list-item surface the plugins tab stacks; open state flips
+   data-open on the card and chevron. */
+.dsh_mr_prefCard {
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-3);
+  border-radius: 8px;
+  min-width: 0;
+  list-style: none;
+  transition: border-color 160ms ease, background-color 160ms ease;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.dsh_mr_prefCard[data-open="true"] {
+  background: var(--dsw-alias-bg-layer-2);
+  border-color: var(--dsw-alias-label-dimmed);
+}
+.dsh_mr_prefHeader {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  background: none;
+  border: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  display: flex;
+}
+.dsh_mr_prefHeader:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.dsh_mr_prefHeadText {
+  flex-direction: column;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+}
+.dsh_mr_prefName {
+  color: var(--dsw-alias-label-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  overflow: hidden;
+}
+.dsh_mr_prefDescription {
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  overflow: hidden;
+}
+.dsh_mr_prefChevron {
+  color: var(--dsw-alias-label-tertiary);
+  flex: none;
+  font-size: 13px;
+  transition: transform 120ms ease;
+}
+.dsh_mr_prefChevron[data-open="true"] { transform: rotate(180deg); }
+.dsh_mr_prefBody {
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 14px 14px;
+  display: flex;
+}
+.dsh_mr_prefText {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-secondary);
+}
+/* The display preference row inside that card (label left, switch right). The
+   switch is a button[role="switch"] pill with its state mirrored to data-on;
+   colors stay on the alias tokens so both themes invert correctly (on-state
+   knob = layer-1 over brand track). */
+.dsh_mr_livePref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-layer-1);
+  font-size: 12.5px;
+  color: var(--dsw-alias-label-primary);
+}
+.dsh_mr_switch {
+  appearance: none;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  width: 32px;
+  height: 18px;
+  padding: 0 2px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-2);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.dsh_mr_switch:hover { border-color: var(--dsw-alias-brand-primary); }
+.dsh_mr_switch:focus:not(:focus-visible) { outline: none; }
+.dsh_mr_switch:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
+.dsh_mr_switch[data-on="true"] {
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-brand-primary);
+}
+.dsh_mr_switchKnob {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-secondary);
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+.dsh_mr_switch[data-on="true"] .dsh_mr_switchKnob {
+  background: var(--dsw-alias-bg-layer-1);
+  transform: translateX(14px);
+}
 @media (max-width: 640px) {
   .dsh_mr_trendStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dsh_mr_ovRow { grid-template-columns: 18px 16px minmax(0, 1fr) 58px 100px; gap: 5px; }
@@ -806,7 +929,11 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
   .dsh_mr_ovBarFill,
   .dsh_mr_barFill,
   .dsh_mr_taskAggregate > span,
-  .dsh_mr_liveReadout { transition: none; }
+  .dsh_mr_liveReadout,
+  .dsh_mr_switch,
+  .dsh_mr_switchKnob,
+  .dsh_mr_prefCard,
+  .dsh_mr_prefChevron { transition: none; }
 }
 `
 

@@ -1,7 +1,7 @@
 {
   "name": "dsh-models-radar",
   "description": "Model capability radar for the DeepSeek Harness web GUI: a Settings tab that charts codexradar crowd-benchmark scores per model tier — task-composition bars, 7-day IQ trend, efficiency badges",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -29,10 +29,14 @@
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-model-selection"
       ]
     }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.1"
   },
   "files": [
     "lib",
@@ -61,8 +65,10 @@
     "@deepseek-ai/dsh-client-locale": "*",
     "@deepseek-ai/dsh-client-ui-slots": "*",
     "@deepseek-ai/dsh-client-ui-settings": "*",
+    "@deepseek-ai/dsh-client-ui-settings-plugins": "*",
     "@deepseek-ai/dsh-client-ui-conversation": "*",
     "@deepseek-ai/dsh-client-ui-model-selection": "*",
+    "@deepseek-ai/dsh-settings": ">=0.1.0-rc.6",
     "react": "^18.2.0"
   },
   "peerDependenciesMeta": {
@@ -81,10 +87,16 @@
     "@deepseek-ai/dsh-client-ui-settings": {
       "optional": true
     },
+    "@deepseek-ai/dsh-client-ui-settings-plugins": {
+      "optional": true
+    },
     "@deepseek-ai/dsh-client-ui-conversation": {
       "optional": true
     },
     "@deepseek-ai/dsh-client-ui-model-selection": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-settings": {
       "optional": true
     },
     "react": {
