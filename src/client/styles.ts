@@ -335,11 +335,14 @@ span.dsh_mr_ovChevron { cursor: default; }
   border-radius: 50%;
   background: var(--dsh-mr-harness-color, var(--dsw-alias-label-secondary));
 }
-.dsh_mr_ovHarness[data-harness='codex'] { --dsh-mr-harness-color: #8b5cf6; }
+/* Site harnessbar palette; codex — the site's default harness — wears its
+   default accent, since #8b5cf6 is antigravity's slot there. */
+.dsh_mr_ovHarness[data-harness='codex'] { --dsh-mr-harness-color: #2dd4bf; }
 .dsh_mr_ovHarness[data-harness='dsh'] { --dsh-mr-harness-color: #4d6bfe; }
 .dsh_mr_ovHarness[data-harness='zcode'] { --dsh-mr-harness-color: #06b6d4; }
 .dsh_mr_ovHarness[data-harness='grok'] { --dsh-mr-harness-color: #f59e0b; }
 .dsh_mr_ovHarness[data-harness='kimi-code'] { --dsh-mr-harness-color: #10b981; }
+.dsh_mr_ovHarness[data-harness='antigravity'] { --dsh-mr-harness-color: #8b5cf6; }
 .dsh_mr_ovHarnessLabel { color: var(--dsw-alias-label-secondary); letter-spacing: 0.2px; }
 .dsh_mr_ovChild .dsh_mr_ovName { color: var(--dsw-alias-label-secondary); }
 .dsh_mr_ovDelta {
@@ -664,6 +667,7 @@ span.dsh_mr_ovChevron { cursor: default; }
   white-space: nowrap;
   color: var(--dsw-alias-label-primary);
 }
+.dsh_mr_tipHead { font-weight: 700; }
 .dsh_mr_liveReadout {
   box-sizing: border-box;
   appearance: none;

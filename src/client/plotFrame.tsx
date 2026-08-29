@@ -51,16 +51,19 @@ export function PlotTip({
   y,
   width,
   height,
+  accent,
   children,
 }: {
   x: number
   y: number
   width: number
   height: number
+  /** Optional series accent for the border (cost scatter's model color); absent keeps the neutral border. */
+  accent?: string
   children: ReactNode
 }) {
   return (
-    <div className="dsh_mr_tip" style={{ left: `${(x / width) * 100}%`, top: `${(y / height) * 100}%` }}>
+    <div className="dsh_mr_tip" style={{ left: `${(x / width) * 100}%`, top: `${(y / height) * 100}%`, borderColor: accent }}>
       {children}
     </div>
   )

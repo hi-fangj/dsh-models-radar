@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import {
   buildCostDataset,
   combinedCostIndex,
+  combinedIndexText,
   DEFAULT_HIDDEN_BASES,
   listBases,
+  tipSampleCounts,
 } from '../src/client/costMetrics.ts'
 
 const tier = (model, effort, iq, avgPrice, avgMinutes, keySuffix = '') => ({
@@ -14,6 +16,7 @@ const tier = (model, effort, iq, avgPrice, avgMinutes, keySuffix = '') => ({
   avgPrice,
   avgMinutes,
   cacheHit: null,
+  tokenSamples: 0,
   passed: 0,
   total: 0,
   passRate: null,
@@ -26,6 +29,18 @@ assert.equal(combinedCostIndex(-1, 5), null)
 assert.equal(combinedCostIndex(2, 10), 200)
 
 assert.deepEqual(DEFAULT_HIDDEN_BASES, ['deepseek-v4-flash', 'deepseek-v4-pro'])
+
+// Site tooltip formats: composite index caps at 100, otherwise 2+ magnitude
+// decimals with trailing zeros trimmed; samples are token-ledger cost runs vs
+// all graded runs, with legacy (field-less) snapshots falling back to total.
+assert.equal(combinedIndexText(100), '100')
+assert.equal(combinedIndexText(370654), '100')
+assert.equal(combinedIndexText(1.4436), '1.44')
+assert.equal(combinedIndexText(45.2), '45.2')
+assert.equal(combinedIndexText(0.35), '0.35')
+assert.deepEqual(tipSampleCounts({ tokenSamples: 181, total: 191 }), { price: 181, minutes: 191 })
+assert.deepEqual(tipSampleCounts({ tokenSamples: 0, total: 31 }), { price: 31, minutes: 31 })
+assert.deepEqual(tipSampleCounts({ tokenSamples: undefined, total: 210 }), { price: 210, minutes: 210 })
 
 // Chip row must list every base — hidden ones included — in first-seen order.
 assert.deepEqual(

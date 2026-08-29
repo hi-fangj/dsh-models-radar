@@ -34,6 +34,30 @@ export function combinedCostIndex(price: number | null, minutes: number | null):
 }
 
 /**
+ * The site's composite-index number format (its efficiencyTickText): 100 caps,
+ * otherwise 2+ decimals chosen from the magnitude, trailing zeros trimmed —
+ * the tooltip reads the plotted (normalized) value through this.
+ */
+export function combinedIndexText(value: number): string {
+  if (value >= 100) return '100'
+  const decimals = Math.min(5, Math.max(2, Math.ceil(-Math.log10(value))))
+  return String(Number(value.toFixed(decimals)))
+}
+
+/**
+ * Sample counts behind the site-format tooltip: cost samples are the
+ * token-ledger runs, runtime samples are all graded runs. Legacy snapshots
+ * predate tokenSamples (and 0 means "no token ledger") — both fall back to the
+ * graded total.
+ */
+export function tipSampleCounts(tier: { tokenSamples?: number; total: number }): { price: number; minutes: number } {
+  return {
+    price: tier.tokenSamples !== undefined && tier.tokenSamples > 0 ? tier.tokenSamples : tier.total,
+    minutes: tier.total,
+  }
+}
+
+/**
  * Dedupe base models in first-seen order. The filter chip row lists every
  * base — hidden ones included — so they stay clickable to re-enable.
  */

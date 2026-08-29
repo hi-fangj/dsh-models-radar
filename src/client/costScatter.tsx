@@ -2,7 +2,9 @@
  * Cost × IQ comparison scatter (settings page only): three stacked panels —
  * composite cost, time cost, price cost — over every visible tier, encoded
  * exactly like the radar site: color = base model (site palette), marker
- * shape = reasoning effort, log x-axis, linear IQ axis (0–120).
+ * shape = reasoning effort, log x-axis, linear IQ axis (0–120). Hovering
+ * surfaces the site's own three-line reading: attribution · IQ (pass/total) ·
+ * metric value with sample counts.
  *
  * The composite index is derived client-side from fields the contract already
  * carries (avgPrice, avgMinutes) using the site's own trade-off formula
@@ -15,20 +17,29 @@ import type { RadarView } from '../contract.ts'
 import type { ModelRadarKey } from './locales.ts'
 import {
   buildCostDataset,
+  combinedIndexText,
   DEFAULT_HIDDEN_BASES,
   EFFORT_ORDER,
   listBases,
+  tipSampleCounts,
   type CostMetric,
   type CostLadder,
   type ScatterPoint,
 } from './costMetrics.ts'
+import { costModelLabel, harnessMeta } from './harness.ts'
+import { fmt } from './locales.ts'
 import { AXIS_STYLE, HGrid, PLOT_H, PLOT_W, PlotTip, viewBoxX } from './plotFrame.tsx'
 import { logDomain } from './plotGeometry.ts'
 
-/** Site-canonical per-base palette (its MODEL_COLORS table, verbatim). */
-const MODEL_COLORS: Record<string, string> = {
+/**
+ * Site-canonical per-base palettes, resolved in the site's order: the
+ * efficiency chart's EFFICIENCY_MODEL_COLORS overrides first, then its general
+ * MODEL_COLORS, then the muted fallback (the site's FALLBACK_COLORS slot).
+ */
+const BASE_MODEL_COLORS: Record<string, string> = {
   'grok-4.6': '#f59e0b',
   k3: '#10b981',
+  'gemini-3.7-flash': '#8b5cf6',
   'glm-5.3': '#f5f5f5',
   'glm-5.3-flash': '#f6c453',
   'gpt-5.6-sol': '#eab308',
@@ -42,8 +53,24 @@ const MODEL_COLORS: Record<string, string> = {
   'dsh-deepseek-v4-flash-vision-exp': '#22c55e',
 }
 
+const EFFICIENCY_MODEL_COLORS: Record<string, string> = {
+  'gpt-5.5': '#22d3ee',
+  'glm-5.3': '#06b6d4',
+  'glm-5.3-flash': '#f6c453',
+  'grok-4.6': '#f59e0b',
+  'gemini-3.7-flash': '#a78bfa',
+  'gpt-5.6-sol': '#fbbf24',
+  'gpt-5.6-terra': '#3b82f6',
+  'gpt-5.6-luna': '#d5dbe5',
+  'deepseek-v4-flash': '#c026d3',
+  'deepseek-v4-pro': '#f472b6',
+  'dsh-deepseek-v4-flash': '#c026d3',
+  'dsh-deepseek-v4-pro': '#f472b6',
+  'dsh-deepseek-v4-flash-vision-exp': '#16a34a',
+}
+
 function modelColor(base: string): string {
-  return MODEL_COLORS[base] ?? 'var(--dsw-alias-label-secondary)'
+  return EFFICIENCY_MODEL_COLORS[base] ?? BASE_MODEL_COLORS[base] ?? 'var(--dsw-alias-label-secondary)'
 }
 
 /** Site's efficiencyShapePath: marker shape per reasoning effort. */
@@ -101,6 +128,7 @@ function logTicks(min: number, max: number): number[] {
   return ticks
 }
 
+/** Axis-tick label per metric (compact, mixed precision — the tooltip formats its own values). */
 function fmtX(metric: 'combined' | 'minutes' | 'price', value: number): string {
   if (metric === 'price') return `$${value < 1 ? value.toFixed(2) : value >= 10 ? Math.round(value) : value.toFixed(1)}`
   if (metric === 'minutes') return `${value < 10 ? value.toFixed(1) : Math.round(value)} 分钟`
@@ -109,6 +137,36 @@ function fmtX(metric: 'combined' | 'minutes' | 'price', value: number): string {
 
 const PAD = { top: 14, right: 16, bottom: 26, left: 40 }
 const IQ_MAX = 120
+
+/**
+ * The site's three-line efficiency tooltip, same words and full-width
+ * punctuation as deng.codexradar.com: the attribution line (display name ·
+ * billing · harness · effort, bold in the model's series color), the IQ
+ * readout with its graded pass/total, then the active metric's line with its
+ * sample counts — composite index on the combined tab (the plotted, normalized
+ * value through the site's tick format), whole minutes / dollars elsewhere.
+ */
+function CostTip({ point, metric, t }: { point: ScatterPoint; metric: CostMetric; t: (key: ModelRadarKey) => string }) {
+  const tier = point.tier
+  const label = costModelLabel(tier.model)
+  const attribution = [label.name, label.billing === 'api' ? 'API' : t('cost.tip.sub')]
+  if (label.harness !== null) attribution.push(harnessMeta(label.harness).label)
+  attribution.push(tier.effort)
+  const samples = tipSampleCounts(tier)
+  const metricLine =
+    metric === 'combined'
+      ? fmt(t('cost.tip.combined'), { index: combinedIndexText(point.x), price: String(samples.price), minutes: String(samples.minutes) })
+      : metric === 'minutes'
+        ? fmt(t('cost.tip.minutes'), { minutes: String(Math.round(point.x)), samples: String(samples.minutes) })
+        : fmt(t('cost.tip.price'), { price: `$${point.x.toFixed(2)}`, samples: String(samples.price) })
+  return (
+    <>
+      <div className="dsh_mr_tipHead" style={{ color: modelColor(tier.model) }}>{attribution.join(' · ')}</div>
+      <div>{fmt(t('cost.tip.iq'), { iq: tier.iq.toFixed(1), passed: String(tier.passed), total: String(tier.total) })}</div>
+      <div>{metricLine}</div>
+    </>
+  )
+}
 
 /**
  * One log-x panel: IQ gridlines, decade ticks, and one shape marker per
@@ -221,8 +279,8 @@ function CostPanel({
           ))}
         </svg>
         {hovered !== undefined && (
-          <PlotTip x={px(hovered.x)} y={py(hovered.iq)} width={PLOT_W} height={PLOT_H}>
-            {hovered.tier.model} · {hovered.tier.effort} · IQ {hovered.tier.iq.toFixed(1)} · {fmtX(metric, hovered.x)}
+          <PlotTip x={px(hovered.x)} y={py(hovered.iq)} width={PLOT_W} height={PLOT_H} accent={modelColor(hovered.tier.model)}>
+            <CostTip point={hovered} metric={metric} t={t} />
           </PlotTip>
         )}
       </div>

@@ -23,6 +23,8 @@ export interface RadarTier {
   avgMinutes: number | null
   /** Cache hit rate in [0,1], when published. */
   cacheHit: number | null
+  /** Graded runs whose cost came from a complete token ledger (the cost tooltip's 费用 sample count). */
+  tokenSamples: number
   /** Graded runs passed / attempted (rolling window). */
   passed: number
   total: number

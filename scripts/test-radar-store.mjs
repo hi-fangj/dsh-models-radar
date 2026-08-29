@@ -44,6 +44,7 @@ const payloadFor = (kind) => {
             average_price_usd: 2,
             average_minutes: 10,
             cache_hit_rate: 0.5,
+            token_samples: 8,
             passed: 8,
             total: 10,
             runs_24h: 3,
@@ -163,6 +164,8 @@ test('并发同频道请求只产生一组上游请求（single-flight）', asyn
   // Series attach via the exact-tier → base-model fallback; task rows carry majority vote.
   assert.deepEqual(a.data.series['m1@high'], [['2026-08-28T00:00:00Z', 88]])
   assert.deepEqual(a.data.taskRates['m1@high'], [['t1', 0.9, true]])
+  // Cost sample count flows through for the site-format tooltip.
+  assert.equal(a.data.tiers[0].tokenSamples, 8)
 })
 
 test('bypass 仍并入 in-flight（手动刷新不重复打上游）', async () => {

@@ -51,8 +51,9 @@
   ],
   "scripts": {
     "build": "node build.mjs",
-    "test": "npm run test:cost && npm run test:store && npm run test:tasks && npm run test:match && npm run test:score && npm run test:plot",
+    "test": "npm run test:cost && npm run test:store && npm run test:tasks && npm run test:match && npm run test:harness && npm run test:score && npm run test:plot",
     "test:cost": "node --experimental-strip-types scripts/test-cost-metrics.mjs",
+    "test:harness": "node --experimental-strip-types scripts/test-harness.mjs",
     "test:match": "node --experimental-strip-types scripts/test-tier-match.mjs",
     "test:plot": "node --experimental-strip-types scripts/test-plot-geometry.mjs",
     "test:score": "node --experimental-strip-types scripts/test-score-metrics.mjs",

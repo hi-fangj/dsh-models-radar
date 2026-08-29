@@ -68,6 +68,7 @@ interface UpPoint {
   average_price_usd?: number | null
   average_minutes?: number | null
   cache_hit_rate?: number | null
+  token_samples?: number
   passed?: number
   total?: number
   runs_24h?: number
@@ -288,6 +289,7 @@ export function createRadarDataStore(
         avgPrice: num(point.average_price_usd),
         avgMinutes: num(point.average_minutes),
         cacheHit: num(point.cache_hit_rate),
+        tokenSamples: num(point.token_samples) ?? 0,
         passed,
         total,
         passRate: total > 0 ? passed / total : null,
