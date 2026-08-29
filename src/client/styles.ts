@@ -692,32 +692,43 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_liveReadout:active { background: var(--dsw-alias-interactive-bg-active); }
 .dsh_mr_liveReadout:focus:not(:focus-visible) { outline: none; }
 .dsh_mr_liveReadout:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
-/* The dock slot renders entries as a Fragment under InputBar's vertical root.
-   When the known billing entry precedes this readout, promote only that exact
-   parent to a centered grid: composer chrome spans all columns; the two pills
-   sit side-by-side in the middle columns. */
-div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"] + .dsh_mr_liveReadout) {
+/* The dock slot anchor renders as a Fragment (display:contents) under
+   InputBar's vertical root, so the readout stacks as its own centered row.
+   When the billing pill is docked too — anywhere among the siblings, not
+   necessarily adjacent — promote the anchor to an explicit grid: row 1 holds
+   the two pills as one centered pair between 1fr rails (definite rows and
+   columns, so the placement is identical at every viewport width and never
+   depends on flex wrapping), and every other entry lands on its own full
+   row 2. If either pill is absent the :has() pair never matches and the
+   readout keeps its standalone row. */
+div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"]):has(> .dsh_mr_liveReadout) {
   display: grid !important;
   width: 100%;
   grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr);
   align-items: center;
   column-gap: 8px;
+  row-gap: 6px;
 }
-div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"] + .dsh_mr_liveReadout)
-  > :not([data-testid="billing-live-cost-bar"]):not(.dsh_mr_liveReadout) {
-  grid-column: 1 / -1;
-}
-div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"] + .dsh_mr_liveReadout)
+div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"]):has(> .dsh_mr_liveReadout)
   > [data-testid="billing-live-cost-bar"] {
   grid-column: 2;
+  grid-row: 1;
   justify-self: end;
-  margin-left: 0;
-  margin-right: 0;
 }
-div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"] + .dsh_mr_liveReadout)
+div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"]):has(> .dsh_mr_liveReadout)
   > .dsh_mr_liveReadout {
   grid-column: 3;
+  grid-row: 1;
   justify-self: start;
+}
+/* Every other dock entry (the shell's stats strip and friends) takes its own
+   full row below the pair, its inner content staying centered — the shell
+   stats line is already a centered full-width block under its own wrapper. */
+div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"]):has(> .dsh_mr_liveReadout)
+  > :not([data-testid="billing-live-cost-bar"]):not(.dsh_mr_liveReadout) {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: center;
 }
 .dsh_mr_liveLabel { color: var(--dsw-alias-label-secondary); font-size: 10.5px; }
 /* The IQ value sits in a small band-tinted chip; color/background are inline
