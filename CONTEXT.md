@@ -57,7 +57,7 @@ _Avoid_: family、裸模型名
 _Avoid_: 排行榜、leaderboard（界面用语中）、能力列表（可能与任务能力构成混淆）
 
 **Harness**:
-贡献者提交判分所用的 agent 运行器，现役六种：Codex、DSH、ZCode、Grok、Kimi Code、Antigravity。由被测配置的模型标识推导得出（如 `dsh-` 前缀、`glm-5.3*`、`k3`、`grok-4.6`、`gemini-3.7-flash`），是档位的展示层派生属性：只标注出处，不参与排行、分组或聚合——分数永远以档位为单位。推导不出的档位不打标。
+贡献者提交判分所用的 agent 运行器，现役七种：Codex、DSH、ZCode、Grok、Kimi Code、Antigravity、CodeBuddy。由被测配置的模型标识推导得出（如 `dsh-` 前缀、`glm-5.3*`、`k3`、`grok-4.6`、`gemini-3.7-flash`、`hy4-preview`），是档位的展示层派生属性：只标注出处，不参与排行、分组或聚合——分数永远以档位为单位。推导不出的档位不打标。
 _Avoid_: 评测端、运行器、客户端、benchmark
 
 **能力等级（Capability Band）**:
@@ -73,7 +73,7 @@ _Avoid_: 通用通过率（跨频道混用时）、统一状态
 _Avoid_: 题库、元数据接口、repo 字段直出（UI 只说「源仓库」）
 
 **会话能力读数（Session Capability Readout）**:
-输入框下方针对当前 session 下一次请求所选模型档位的紧凑 DeepSWE 读数：当前 IQ、24h 变化与 48h 微型趋势。精确档位不存在时以 `≈` 标识同基座最强档位；基座不存在时不显示。它同时是可点击的入口：点击展开能力浮层。
+输入框工具行内、模型选择器左侧的紧凑 DeepSWE 读数（`SWE IQ` 标签 + 档位色分数药丸）：当前 IQ 一项读数，24h 变化等信息留给能力浮层。精确档位不存在时以 `≈` 标识同基座最强档位；基座不存在时不显示。它同时是可点击的入口：点击展开能力浮层。
 _Avoid_: 当前模型分（未说明频道时）、综合能力分
 
 **综合成本指数（Composite Cost Index）**:

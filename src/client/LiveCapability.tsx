@@ -1,19 +1,21 @@
 /**
- * Ambient composer-dock readout for the session's currently selected model:
- * DeepSWE IQ, 24h delta, and a compact 48h sparkline. The official
+ * Composer tool-row readout for the session's currently selected model — the
+ * conversation.input.right seat, immediately left of the model selector,
+ * because the DeepSWE IQ it shows is that model's property. The official
  * modelDirectories store is the fact source, so switching the composer model
  * updates this component immediately without polling or guessing from history.
  *
- * The readout is a clickable capsule: clicking toggles the capability popover,
- * a non-modal anchored panel showing the full tier overview (every base
- * model's best tier, ranked) plus the detail for one viewed tier (badges, IQ
- * trend, per-task pass composition). The viewed tier defaults to the session's
- * matched tier and follows it live; clicking an overview row temporarily views
- * that tier instead, until the session match changes or the popover closes.
- * The popover renders from the readout's already-loaded view — opening costs
- * zero requests — and closes on outside pointerdown, Escape, or when the tier
- * match disappears. The readout can be hidden entirely from the Settings tab
- * (「显示会话能力浮窗」): hidden means no capsule, no popover and no polling.
+ * The readout is a compact clickable control: clicking toggles the capability
+ * popover, a non-modal anchored panel showing the full tier overview (every
+ * base model's best tier, ranked) plus the detail for one viewed tier (badges,
+ * IQ trend, per-task pass composition). The viewed tier defaults to the
+ * session's matched tier and follows it live; clicking an overview row
+ * temporarily views that tier instead, until the session match changes or the
+ * popover closes. The popover renders from the readout's already-loaded view —
+ * opening costs zero requests — and closes on outside pointerdown, Escape, or
+ * when the tier match disappears. The readout can be hidden entirely from the
+ * Settings tab (「显示会话能力浮窗」): hidden means no capsule, no popover and
+ * no polling.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
@@ -21,7 +23,7 @@ import type { PropsLocale, PropsRuntime, InjectFace } from '@deepseek-ai/dsh-cli
 import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { RadarPayload, RadarView } from '../contract.ts'
 import { SOURCE_SITE_URL } from '../contract.ts'
-import { bandColor, deltaSignal, iqBand, trendSummary } from './scoreMetrics.ts'
+import { bandColor, iqBand } from './scoreMetrics.ts'
 import { matchTier } from './tierMatch.ts'
 import { liveVisibleStore } from './liveVisible.ts'
 import { TierOverview } from './Overview.tsx'
@@ -42,7 +44,7 @@ export interface LiveCapabilityInjected {
   loadData: (benchmark: string, signal?: AbortSignal, bypass?: boolean) => Promise<RadarPayload>
 }
 
-export type LiveCapabilityProps = PropsRuntime<'conversation.composer.dock'> &
+export type LiveCapabilityProps = PropsRuntime<'conversation.input.right'> &
   InjectFace<LiveCapabilityInjected> &
   PropsLocale<'model-radar'>
 
@@ -75,7 +77,7 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
   }, [directory])
 
   useEffect(() => {
-    // Hidden readout: no polling at all — the settings switch stops all dock
+    // Hidden readout: no polling at all — the settings switch stops all readout
     // traffic. Re-showing restarts the cycle with an immediate refresh.
     if (!liveVisible) return
     let cancelled = false
@@ -86,7 +88,7 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
           if (!cancelled && payload.data !== null) setView(payload.data)
         },
         () => {
-          // Keep the last successful value: the dock is ambient, not an error surface.
+          // Keep the last successful value: the readout is ambient, not an error surface.
         },
       )
     }
@@ -183,15 +185,7 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
     viewTierKey !== null ? (view.tiers.find((candidate) => candidate.key === viewTierKey) ?? tier) : tier
   const viewingSessionTier = detailTier.key === tier.key
   // The capsule always reflects the session-matched tier: viewing another
-  // tier in the popover must not change the readout's IQ, delta, or sparkline.
-  const capsuleSeries = view.series[tier.key] ?? []
-  const capsuleTrend = trendSummary(capsuleSeries)
-  const capsuleDirection = capsuleTrend?.direction ?? 'flat'
-  // Null trend keeps the legacy `→ —` readout: flat glyph over an em dash.
-  const capsuleDelta =
-    capsuleTrend === null
-      ? { glyph: '→', text: '—' }
-      : deltaSignal({ direction: capsuleTrend.direction, delta: capsuleTrend.delta24h })
+  // tier in the popover must not change the readout's IQ.
   const displayedIq = `${match.approximate ? '≈' : ''}${tier.iq.toFixed(1)}`
 
   const detailSeries = view.series[detailTier.key] ?? []
@@ -276,7 +270,6 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
         >
           {displayedIq}
         </strong>
-        <span className="dsh_mr_liveDelta" data-dir={capsuleDirection}>{capsuleDelta.glyph} {capsuleDelta.text}</span>
       </button>
       {popover}
     </>

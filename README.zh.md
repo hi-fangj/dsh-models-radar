@@ -18,11 +18,11 @@
   <img src="https://img.shields.io/badge/DeepSeek%20Harness-plugin-4d6bfe?style=flat-square" alt="DSH plugin">
 </p>
 
-面向 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) Web GUI 的模型能力雷达插件。插件读取 [deng.codexradar.com](https://deng.codexradar.com) 的公开众测数据，在设置页增加「模型雷达」页面，并在输入框下方显示当前 session 所选模型的 DeepSWE 实时能力读数。
+面向 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) Web GUI 的模型能力雷达插件。插件读取 [deng.codexradar.com](https://deng.codexradar.com) 的公开众测数据，在设置页增加「模型雷达」页面，并在输入框工具行内（模型选择器左侧）显示当前 session 所选模型的 DeepSWE 实时能力读数。
 
 ## 截图预览
 
-**设置页 · 能力总览** — 每基座最强档排行，行内标注分数出处 Harness（Codex / DSH / ZCode / Grok / Kimi Code / Antigravity），点击任意行切换下方图表的档位。
+**设置页 · 能力总览** — 每基座最强档排行，行内标注分数出处 Harness（Codex / DSH / ZCode / Grok / Kimi Code / Antigravity / CodeBuddy），点击任意行切换下方图表的档位。
 
 ![设置页 · 能力总览](docs/screenshots/settings-overview.png)
 
@@ -32,7 +32,7 @@
 
 ## 亮点
 
-- **分数出处一眼可辨。** 每个基座行内都带 Harness 徽章（Codex / DSH / ZCode / Grok / Kimi Code / Antigravity，站点同款配色），档位选择器的选项同样写全「模型 · 力度 · Harness」；识别不了的基座不打标，绝不猜测。
+- **分数出处一眼可辨。** 每个基座行内都带 Harness 徽章（Codex / DSH / ZCode / Grok / Kimi Code / Antigravity / CodeBuddy，站点同款配色），档位选择器的选项同样写全「模型 · 力度 · Harness」；识别不了的基座不打标，绝不猜测。
 - **每基座最强档排行。** 能力总览按基座聚合，行内嵌固定 `0–110` 绝对刻度的量级条与 24h 趋势信号，展开可查看该基座全部推理力度档位。
 - **24h / 7d 双窗 IQ 趋势。** 页签切换两个时间窗，各自独立缩放与统计（区间变化、最低、平均、最高）；曲线按能力等级分段着色。
 - **成本 × IQ 三视角对比。** 综合成本（站点同款「2.5 倍价格可换 1.35 倍速度」折算公式，图内归一化）、时间成本、费用成本页签切换；颜色＝基座、形状＝推理力度，同基座档位以折线相连，越靠左上越高效。悬停读数与站点同构三行：归属（展示名 · 计费 · Harness · 力度）、IQ（通过/总数）、当前指标与样本数。
@@ -191,14 +191,14 @@ DeepSWE 使用上游真实的多数票判定；Pompeii 保留连续 F1 语义。
 
 ### 能力浮层
 
-点击输入框下方的能力胶囊展开浮层：顶部为全基座能力总览（供对比选型），其下为查看档位的完整详情（效率徽章、双窗 IQ 趋势、任务构成）。查看档位默认跟随会话模型；点击总览行或切换趋势卡档位下拉可临时查看其他档位，会话切换模型或浮层关闭后回到跟随。
+点击输入框工具行里的能力读数展开浮层：顶部为全基座能力总览（供对比选型），其下为查看档位的完整详情（效率徽章、双窗 IQ 趋势、任务构成）。查看档位默认跟随会话模型；点击总览行或切换趋势卡档位下拉可临时查看其他档位，会话切换模型或浮层关闭后回到跟随。
 
-### 输入框下方能力胶囊
+### 输入框能力读数
 
-紧凑能力胶囊读取的是当前 session **下一次请求**选中的模型，而不是仅根据最近一次已完成回复推测。显示形式：
+紧凑读数（`SWE IQ` 标签 + 档位色分数药丸）读取的是当前 session **下一次请求**选中的模型，而不是仅根据最近一次已完成回复推测。显示形式：
 
 ```text
-SWE IQ 90.2   ↑ +1.4
+SWE IQ 90.2
 ```
 
 匹配顺序：
@@ -321,7 +321,7 @@ dev_uninject_plugin({ "match": "dsh-models-radar" })
 - `src/client/charts.tsx`：趋势图和任务诊断
 - `src/client/costScatter.tsx`：成本 × IQ 对比散点
 - `src/client/harness.ts`：Harness 归属推导与档位选择器文案
-- `src/client/LiveCapability.tsx`：输入框下方实时能力读数与浮层
+- `src/client/LiveCapability.tsx`：输入框工具行实时能力读数与浮层
 - `src/client/ScrollFrame.tsx`：溢出列表滚动条
 - `src/client/scoreMetrics.ts`：IQ 等级和趋势语义
 - `CONTEXT.md`：项目领域词汇
@@ -342,7 +342,7 @@ dev_uninject_plugin({ "match": "dsh-models-radar" })
 2. 使用 `dev_plugin_status` 确认插件处于 active 状态。
 3. 刷新一次 Web GUI，加载最新 client 依赖图。
 
-### 输入框下方没有能力胶囊
+### 输入框里没有能力读数
 
 - 确认当前模型存在于 DeepSWE 榜单。
 - 同基座 fallback 会显示 `≈`；完全未知的基座按设计不显示。

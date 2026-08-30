@@ -5,7 +5,7 @@
  * matching, benchmark-id validation, bypass parsing, the codexradar upstream
  * adapter (URLs + fetch), the filesystem snapshot adapter, and the
  * default-model service read. The settings namespace `dsh-models-radar` (the
- * composer-dock display preference) is registered here too and edited over the
+ * composer live-readout display preference) is registered here too and edited over the
  * same-origin pref routes. Freshness windows, single-flight, fallback and
  * snapshot-commit ordering all live in the store.
  *
@@ -46,7 +46,7 @@ const ROUTE_PREFIX = '/model-radar'
 const FETCH_TIMEOUT_MS = 30_000
 
 /**
- * Settings namespace serving the composer-dock display preference. The value
+ * Settings namespace serving the composer live-readout display preference. The value
  * must stay a lowercase kebab string (the dsh-settings namespace grammar) and
  * must equal the client pref card's slot key — the Plugins configuration tab
  * dispatches cards by pairing served namespaces with registered card keys.

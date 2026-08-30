@@ -1,7 +1,7 @@
 /**
  * The「模型雷达」settings section: channel switcher, efficiency badges, the
  * tier picker with an IQ trend line, and the per-task pass-composition bars.
- * (The dock-readout display switch lives in the plugin-configuration card —
+ * (The live-readout display switch lives in the plugin-configuration card —
  * PrefCard.tsx.)
  *
  * Data flows through the host half's same-origin /model-radar/api/data route

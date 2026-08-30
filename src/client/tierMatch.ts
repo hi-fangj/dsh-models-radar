@@ -1,7 +1,7 @@
 /**
  * Tier match (档位匹配, see CONTEXT.md) — the single three-step rule that
  * resolves the session's current model to a leaderboard tier, shared by the
- * composer dock capsule and the settings page default selection:
+ * composer readout capsule and the settings page default selection:
  *
  * ① exact `model@effort`; ② strongest tier of the same base (`view.tiers`
  * arrives IQ-descending, so the first hit is the base's best effort);

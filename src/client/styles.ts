@@ -343,6 +343,7 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_ovHarness[data-harness='grok'] { --dsh-mr-harness-color: #f59e0b; }
 .dsh_mr_ovHarness[data-harness='kimi-code'] { --dsh-mr-harness-color: #10b981; }
 .dsh_mr_ovHarness[data-harness='antigravity'] { --dsh-mr-harness-color: #8b5cf6; }
+.dsh_mr_ovHarness[data-harness='codebuddy'] { --dsh-mr-harness-color: #ec4899; }
 .dsh_mr_ovHarnessLabel { color: var(--dsw-alias-label-secondary); letter-spacing: 0.2px; }
 .dsh_mr_ovChild .dsh_mr_ovName { color: var(--dsw-alias-label-secondary); }
 .dsh_mr_ovDelta {
@@ -702,26 +703,35 @@ a.dsh_mr_barLabel:hover { color: var(--dsw-alias-brand-primary); text-decoration
   color: var(--dsw-alias-label-primary);
 }
 .dsh_mr_tipHead { font-weight: 700; }
+/* The live readout in the composer tool row (conversation.input.right, left of
+   the model selector): compact text form — no pill chrome of its own, the
+   band-tinted IQ chip carries the color. flex:none keeps it whole; the shell's
+   trailing group wraps to its own line when the card runs out of width.
+   Typography mirrors the model trigger (13/20/500) instead of inheriting the
+   composer's metrics: identical line boxes are what keep the two controls on
+   one text band — every item here shares the trigger's 20px line. */
 .dsh_mr_liveReadout {
   box-sizing: border-box;
   appearance: none;
   display: inline-flex;
   align-items: center;
-  align-self: center;
-  gap: 6px;
+  flex: none;
+  gap: 5px;
   min-width: 0;
-  height: 28px;
-  padding: 0 9px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  padding: 0 6px;
+  border: none;
   border-radius: 14px;
-  background: var(--dsw-alias-bg-layer-1);
+  background: none;
+  height: 28px;
   color: var(--dsw-alias-label-primary);
   font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  text-align: left;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition: background-color 120ms ease;
 }
 /* Hover/pressed use the shell's overlay tokens, not the layer ladder: in the
    light theme bg-layer-1/2/3 collapse to the same color, so the layer ladder
@@ -730,51 +740,14 @@ a.dsh_mr_barLabel:hover { color: var(--dsw-alias-brand-primary); text-decoration
 .dsh_mr_liveReadout:active { background: var(--dsw-alias-interactive-bg-active); }
 .dsh_mr_liveReadout:focus:not(:focus-visible) { outline: none; }
 .dsh_mr_liveReadout:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary); outline-offset: 1px; }
-/* The dock slot anchor renders as a Fragment (display:contents) under
-   InputBar's vertical root, so the readout stacks as its own centered row.
-   When the billing pill is docked too — anywhere among the siblings, not
-   necessarily adjacent — promote the anchor to an explicit grid: row 1 holds
-   the two pills as one centered pair between 1fr rails (definite rows and
-   columns, so the placement is identical at every viewport width and never
-   depends on flex wrapping), and every other entry lands on its own full
-   row 2. If either pill is absent the :has() pair never matches and the
-   readout keeps its standalone row. */
-div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"]):has(> .dsh_mr_liveReadout) {
-  display: grid !important;
-  width: 100%;
-  grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr);
-  align-items: center;
-  column-gap: 8px;
-  row-gap: 6px;
-}
-div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"]):has(> .dsh_mr_liveReadout)
-  > [data-testid="billing-live-cost-bar"] {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-}
-div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"]):has(> .dsh_mr_liveReadout)
-  > .dsh_mr_liveReadout {
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: start;
-}
-/* Every other dock entry (the shell's stats strip and friends) takes its own
-   full row below the pair, its inner content staying centered — the shell
-   stats line is already a centered full-width block under its own wrapper. */
-div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cost-bar"]):has(> .dsh_mr_liveReadout)
-  > :not([data-testid="billing-live-cost-bar"]):not(.dsh_mr_liveReadout) {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  justify-self: center;
-}
 .dsh_mr_liveLabel { color: var(--dsw-alias-label-secondary); font-size: 10.5px; }
-/* The IQ value sits in a small band-tinted chip; color/background are inline
-   (band color + color-mix tint) so the band semantics cannot be lost to
-   selector or ordering issues. */
+/* The IQ value sits in a small band-tinted chip on the same 20px line as the
+   label and the model trigger's text; color/background are inline (band color
+   + color-mix tint) so the band semantics cannot be lost to selector or
+   ordering issues. */
 .dsh_mr_liveIq {
-  font-size: 12.5px;
-  line-height: 18px;
+  font-size: 13px;
+  line-height: 20px;
   padding: 0 6px;
   border-radius: 7px;
 }
@@ -783,10 +756,6 @@ div[data-slot="conversation.composer.dock"]:has(> [data-testid="billing-live-cos
 .dsh_mr_liveReadout[data-band="steady"] .dsh_mr_liveIq { color: ${STEADY_COLOR}; }
 .dsh_mr_liveReadout[data-band="excellent"] .dsh_mr_liveIq,
 .dsh_mr_liveReadout[data-band="leading"] .dsh_mr_liveIq { color: var(--dsw-alias-state-success-primary); }
-.dsh_mr_liveDelta { font-size: 10.5px; }
-.dsh_mr_liveDelta[data-dir="up"] { color: var(--dsw-alias-state-success-primary); }
-.dsh_mr_liveDelta[data-dir="down"] { color: var(--dsw-alias-state-error-primary); }
-.dsh_mr_liveDelta[data-dir="flat"] { color: var(--dsw-alias-label-secondary); }
 /* The capability popover: a non-modal anchored panel above the readout,
    portaled to body, rendered at the shell's menu elevation. */
 .dsh_mr_popover {

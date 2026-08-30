@@ -18,11 +18,11 @@
   <img src="https://img.shields.io/badge/DeepSeek%20Harness-plugin-4d6bfe?style=flat-square" alt="DSH plugin">
 </p>
 
-A model capability radar plugin for the [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) Web GUI. It reads public benchmark data from [deng.codexradar.com](https://deng.codexradar.com), adds a **Model Radar** page to Settings, and shows the selected session model's live DeepSWE score below the composer.
+A model capability radar plugin for the [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) Web GUI. It reads public benchmark data from [deng.codexradar.com](https://deng.codexradar.com), adds a **Model Radar** page to Settings, and shows the selected session model's live DeepSWE score in the composer tool row, left of the model selector.
 
 ## Screenshots
 
-**Settings · capability overview** — best-effort-per-base ranking with per-row Harness attribution (Codex / DSH / ZCode / Grok / Kimi Code / Antigravity); click any row to switch the charts below to that tier.
+**Settings · capability overview** — best-effort-per-base ranking with per-row Harness attribution (Codex / DSH / ZCode / Grok / Kimi Code / Antigravity / CodeBuddy); click any row to switch the charts below to that tier.
 
 ![Settings · capability overview](docs/screenshots/settings-overview.png)
 
@@ -32,12 +32,12 @@ A model capability radar plugin for the [DeepSeek Harness](https://github.com/de
 
 ## Highlights
 
-- **Score attribution at a glance.** Every base-model row carries a Harness badge (Codex / DSH / ZCode / Grok / Kimi Code / Antigravity, site palette), and the tier selector options read `model · effort · harness`; unmatchable bases get no badge — never a guess.
+- **Score attribution at a glance.** Every base-model row carries a Harness badge (Codex / DSH / ZCode / Grok / Kimi Code / Antigravity / CodeBuddy, site palette), and the tier selector options read `model · effort · harness`; unmatchable bases get no badge — never a guess.
 - **Best-effort-per-base ranking.** The capability overview groups by base model with a fixed `0–110` absolute-scale magnitude bar and a 24h trend signal per row; expand a row for the base's full reasoning-effort ladder.
 - **24h / 7d dual-window IQ trend.** Tab between two time windows, each independently scaled with its own full stats (net change, low, average, high); the curve is colored by capability band.
 - **Cost × IQ from three angles.** Tabs for composite cost (the site's own 2.5×-price-for-1.35×-speed trade-off, normalized per chart), time cost, and price cost; color = base, shape = reasoning effort, same-base tiers joined by ladder lines. Upper-left = more efficient. Hovering surfaces the site's three-line reading: attribution (display name · billing · harness · effort), IQ with its pass/total, and the active metric with sample counts.
 - **Community ratings.** The codexradar.com main-site community's 0–10 experience scores over rolling 7-day / 24-hour windows as a bar chart: grouped by base model with efforts ordered within each group, color = base, the selected tier highlighted (≈ marks an approximate match), and unrated slots kept as explicit placeholders. Each window carries its own freshness window; the data is global and independent of the benchmark channels.
-- **Live readout beside the composer.** Exact `model@reasoningEffort` matching through DSH's official per-session model directory, updating immediately on model switches; click it to open the capability popover for cross-base comparison.
+- **Live readout beside the model selector.** Exact `model@reasoningEffort` matching through DSH's official per-session model directory, updating immediately on model switches; click it to open the capability popover for cross-base comparison.
 - **Lightweight, credential-free, offline-tolerant.** The browser never hits upstream directly (same-origin host proxy), freshness windows mean zero upstream requests inside a window, the latest local snapshot serves as fallback, and no credentials are requested or submitted.
 
 ## Features
@@ -191,14 +191,14 @@ Task titles and language badges come from the site's task catalog (the `/table` 
 
 ### Capability popover
 
-Click the capability capsule below the composer to open the popover: a full base overview (for comparison) on top and the viewed tier's details below (efficiency badges, dual-window trend, task composition). The viewed tier follows the session model by default; clicking an overview row or using the trend card's tier selector views another tier temporarily until the session model changes or the popover closes.
+Click the readout in the composer tool row (left of the model selector) to open the popover: a full base overview (for comparison) on top and the viewed tier's details below (efficiency badges, dual-window trend, task composition). The viewed tier follows the session model by default; clicking an overview row or using the trend card's tier selector views another tier temporarily until the session model changes or the popover closes.
 
 ### The composer capability capsule
 
 The compact capsule reads the model selected for the session's **next request**, not a guess from the last completed reply. Display:
 
 ```text
-SWE IQ 90.2   ↑ +1.4
+SWE IQ 90.2
 ```
 
 Match order:
@@ -342,7 +342,7 @@ Main sources:
 2. Use `dev_plugin_status` to confirm the plugin is active.
 3. Refresh the Web GUI once to load the latest client dependency graph.
 
-### No capability capsule below the composer
+### No readout in the composer
 
 - Make sure the current model exists on the DeepSWE leaderboard.
 - Same-base fallback shows `≈`; a fully unknown base is hidden by design.

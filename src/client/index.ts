@@ -96,8 +96,13 @@ export function apply(ctx: ClientContext): void {
     inject: () => ({}),
   }, PrefCard))
 
-  ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
-    name: 'conversation.composer.dock',
+  // The live SWE IQ readout sits in the composer tool row immediately left of
+  // the model selector (conversation.input.right renders before the model
+  // seat): the score is the selected model's property, so it belongs beside
+  // it. Clicking still opens the capability popover; the liveVisible
+  // preference governs visibility and polling exactly as before.
+  ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
+    name: 'conversation.input.right',
     id: 'model-radar-live',
     order: 10,
     locale: NS,

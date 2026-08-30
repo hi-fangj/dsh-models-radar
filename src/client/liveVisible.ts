@@ -1,11 +1,11 @@
 /**
- * Show/hide preference for the composer-dock live capability readout (the
+ * Show/hide preference for the composer live capability readout (the
  * SWE IQ capsule and its capability popover), edited from the plugin's card
  * in the Plugins configuration tab. The committed value lives in the Host's
  * `dsh-models-radar` settings namespace and is read/written over the
  * same-origin /model-radar/api/pref routes, so the choice survives browser
  * storage clears and is shared by every browser of the deployment at page
- * load granularity. Same-document propagation (card writes, dock capsule
+ * load granularity. Same-document propagation (card writes, readout capsule
  * reads, different slot trees, storage events never fire) stays on the custom
  * window event behind the `useSyncExternalStore`-shaped store face.
  *
@@ -120,7 +120,7 @@ export function setLiveVisible(visible: boolean): void {
   void writeHostValue(visible)
 }
 
-/** Store face shared by the settings card (writer) and the dock capsule (reader). */
+/** Store face shared by the settings card (writer) and the composer readout (reader). */
 export const liveVisibleStore = {
   subscribe(listener: () => void): () => void {
     window.addEventListener(CHANGE_EVENT, listener)
