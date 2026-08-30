@@ -13,9 +13,17 @@
  * serves the last persisted snapshot flagged `stale`, which renders as a
  * warning banner above otherwise-normal charts plus a manual retry button.
  * A persistent footer refresh button passes `bypass=1` to skip the windows.
+ *
+ * The tier selection defaults to the current conversation's model on every
+ * entry — the session list's `current` resolved through the official
+ * per-session model directory (tier match, CONTEXT.md 档位匹配), with the
+ * payload's deployment default only standing in when no session selection is
+ * resolvable. A manual pick lasts for the visit, and the overview marks the
+ * in-use tier row.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { CommunityRatingsPayload, RadarPayload, RadarView, RatingsWindow } from '../contract.ts'
 import { SOURCE_SITE_URL } from '../contract.ts'
 import { fmt } from './locales.ts'
@@ -25,18 +33,23 @@ import { RatingsCard } from './ratingsCard.tsx'
 import { matchTier } from './tierMatch.ts'
 import { TaskCard, TierBadges, TrendCard } from './TierDetail.tsx'
 
-/** Injected business face: the same-origin data loaders. */
+/** Injected business face: the same-origin data loaders + the per-session model directory. */
 export interface RadarInjected {
   loadData: (benchmark: string, signal?: AbortSignal, bypass?: boolean) => Promise<RadarPayload>
   /** The community-ratings loader (global data, one payload per window). */
   loadRatings: (window: RatingsWindow, signal?: AbortSignal, bypass?: boolean) => Promise<CommunityRatingsPayload>
+  /** The official per-session model directory — the composer readout's fact source. */
+  modelDirectories: ModelDirectoryResolver
 }
 
-/** Full section props: injected face + the locale seat (`t`). */
-export type RadarSectionProps = InjectFace<RadarInjected> & PropsLocale<'model-radar'>
+/**
+ * Full section props: the root-scope runtime share (the global `useSessions`
+ * seat carries the current conversation) + injected face + the locale seat (`t`).
+ */
+export type RadarSectionProps =
+  PropsRuntime<'settings.section'> & InjectFace<RadarInjected> & PropsLocale<'model-radar'>
 
 const LS_BENCH = 'model-radar:benchmark'
-const tierStorageKey = (benchmark: string): string => `model-radar:tier:${benchmark}`
 const RATINGS_LS = 'model-radar:ratings-window'
 
 const readRatingsWindow = (): RatingsWindow =>
@@ -49,10 +62,11 @@ const FALLBACK_CHANNELS: RadarView['channels'] = [
 
 /**
  * Render the radar section.
- * @param props - the data loader and `t`.
+ * @param props - the root runtime share (`useSessions`), the injected loaders
+ *   and model directory, and `t`.
  * @returns the section element tree.
  */
-export function RadarSection({ loadData, loadRatings, t }: RadarSectionProps) {
+export function RadarSection({ loadData, loadRatings, modelDirectories, useSessions, t }: RadarSectionProps) {
   const [benchmark, setBenchmark] = useState<string>(() => localStorage.getItem(LS_BENCH) ?? 'deep-swe')
   const [payload, setPayload] = useState<RadarPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -91,27 +105,72 @@ export function RadarSection({ loadData, loadRatings, t }: RadarSectionProps) {
 
   const view = payload?.data ?? null
 
-  // Selection is remembered per benchmark; switching channels re-reads storage.
-  const [selectedKey, setSelectedKey] = useState<string | null>(() => localStorage.getItem(tierStorageKey(benchmark)))
+  // -------------------------------------------------------------------------
+  // The current conversation's model selection (CONTEXT.md 当前模型's default
+  // source). The settings panel overlays the chat, so the session list's
+  // `current` is the conversation the user is looking at, and its official
+  // model directory — the same store the composer readout reads — is the live
+  // fact source; an already-loaded directory costs zero requests.
+  // -------------------------------------------------------------------------
+  const currentSessionId = useSessions((state) => state.current)
+  const directory = useMemo(() => {
+    if (currentSessionId === undefined) return null
+    try {
+      return modelDirectories.directoryFor(currentSessionId)
+    } catch {
+      // A listed session whose client scope is gone has no directory (the
+      // resolver fails loud); the deployment default stands in below.
+      return null
+    }
+  }, [modelDirectories, currentSessionId])
+  const directoryState = useSyncExternalStore(
+    (listener) => directory?.store.subscribe(listener) ?? (() => {}),
+    () => directory?.store.getSnapshot() ?? null,
+  )
+  // One directory load per entry when the shared store has no selection yet —
+  // the composer readout's mount behavior; a failure leaves the fallback.
   useEffect(() => {
-    setSelectedKey(localStorage.getItem(tierStorageKey(benchmark)))
+    if (directory !== null && directory.store.getSnapshot().current === null) {
+      void directory.load().catch(() => undefined)
+    }
+  }, [directory])
+  const sessionSelection = directoryState?.current ?? undefined
+  // Only an in-flight load withholds the fallback: rendering the deployment
+  // default's tier while the session selection is one RPC away would flash
+  // the wrong tier. A settled directory (selection present or not, load
+  // error, or a route that cannot address model RPCs) resolves immediately.
+  const selectionPending = directoryState?.status === 'loading'
+
+  // Selection is per visit: every entry (and channel switch) re-resolves the
+  // default from the conversation's model, so a manual pick lasts only until
+  // the next entry.
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  useEffect(() => {
+    setSelectedKey(null)
   }, [benchmark])
 
-  // 档位匹配（CONTEXT.md）：部署默认模型 → 默认选中档位；近似命中不设 ≈ 标识。
-  const autoKey = useMemo(
-    () => (view === null ? null : (matchTier(view, view.defaultModel)?.tier.key ?? null)),
-    [view],
+  // 档位匹配（CONTEXT.md）：默认选中 = 当前对话模型；无会话选择可解析时以部署
+  // 默认模型兜底；会话选择已存在但未命中时不兜底，只出提示。近似命中不设 ≈ 标识。
+  const sessionMatch = useMemo(
+    () => (view === null || selectionPending ? null : matchTier(view, sessionSelection)),
+    [view, selectionPending, sessionSelection],
   )
+  const defaultMatch = useMemo(
+    () => (view === null || selectionPending || sessionMatch !== null ? null : matchTier(view, view.defaultModel)),
+    [view, selectionPending, sessionMatch],
+  )
+  const autoKey = sessionMatch?.tier.key ?? defaultMatch?.tier.key ?? null
+  const sessionMatchKey = sessionMatch?.tier.key ?? null
   const tierKey = selectedKey ?? autoKey
   const tier = view?.tiers.find((candidate) => candidate.key === tierKey) ?? null
+  const autoSelection = selectionPending ? undefined : (sessionSelection ?? view?.defaultModel)
   const matchHint =
-    view !== null && selectedKey === null && autoKey === null && view.defaultModel !== undefined
-      ? fmt(t('match.hint'), { model: view.defaultModel.model })
+    view !== null && selectedKey === null && autoKey === null && autoSelection !== undefined
+      ? fmt(t('match.hint'), { model: autoSelection.model })
       : null
 
   const selectTier = (key: string): void => {
     setSelectedKey(key)
-    localStorage.setItem(tierStorageKey(benchmark), key)
   }
 
   const switchBenchmark = (id: string): void => {
@@ -238,7 +297,7 @@ export function RadarSection({ loadData, loadRatings, t }: RadarSectionProps) {
 
       {view !== null && (
         <>
-          <TierOverview view={view} selectedKey={tierKey} onSelect={selectTier} t={t} />
+          <TierOverview view={view} selectedKey={tierKey} currentKey={sessionMatchKey} onSelect={selectTier} t={t} />
 
           <TierBadges tier={tier} t={t} />
 

@@ -45,6 +45,7 @@ A model capability radar plugin for the [DeepSeek Harness](https://github.com/de
 - **Settings → Model Radar** page through the additive `settings.section` slot
 - A **Model Radar** card under Settings → Plugins → Configurable plugins through `settings.plugin.item` (the live-readout display switch, persisted in Host settings)
 - **Capability overview** grouped by base model with expandable reasoning-effort tiers and per-row Harness attribution badges
+- **Entry default = the current conversation's model**: every visit resolves the session's selected model through the tier-match rule (the deployment default only stands in when no session selection is resolvable), the overview marks the in-use row, and a manual pick lasts for the visit only
 - Fixed `0–110` IQ scale with consistent capability-band semantics across channels
 - **Trend tabs**: last 24 hours / last 7 days, each independently y-scaled with full stats; the choice persists
 - **Cost × IQ card**: composite / time / price tabs on a log x-axis, model filter chips synced across tabs, codex-run DSV4 bases hidden by default (site parity)

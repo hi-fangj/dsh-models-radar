@@ -81,7 +81,7 @@ export function apply(ctx: ClientContext): void {
     // in unreleased dev shells). "data" is the closest attributed glyph.
     icon: 'data',
     locale: NS,
-    inject: (): RadarInjected => ({ loadData, loadRatings }),
+    inject: (): RadarInjected => ({ loadData, loadRatings, modelDirectories }),
   }, RadarSection))
 
   // The plugin-configuration card (设置 → 插件 → 可配置插件). The tab
