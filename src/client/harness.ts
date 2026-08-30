@@ -3,8 +3,9 @@
  * a tier's crowd-benchmarked score. Derived purely from the base-model id,
  * mirroring the radar site's own classification intent (its advertised client
  * configs are "zcode-glm-5.3-family…", "kimi-code-k3…", "grok-build-4.6…", the
- * google-antigravity-subscription Gemini (gemini-3.7-flash) plus the
- * dsh-prefixed artifacts). Labels are the site-canonical proper nouns, shared
+ * google-antigravity-subscription Gemini (gemini-3.7-flash), the
+ * codebuddy-subscription HY4 Preview (hy4-preview) plus the dsh-prefixed
+ * artifacts). Labels are the site-canonical proper nouns, shared
  * by both locales. An unmatched model gets NO badge — never a guess.
  *
  * Also home to the cost chart's display-label derivation (the site's
@@ -15,7 +16,7 @@
  * persisted snapshots, so old snapshots render unchanged.
  */
 
-export type HarnessId = 'codex' | 'dsh' | 'zcode' | 'grok' | 'kimi-code' | 'antigravity'
+export type HarnessId = 'codex' | 'dsh' | 'zcode' | 'grok' | 'kimi-code' | 'antigravity' | 'codebuddy'
 
 export interface HarnessMeta {
   label: string
@@ -30,6 +31,7 @@ const HARNESS_META: Record<HarnessId, HarnessMeta> = {
   grok: { label: 'Grok', color: '#f59e0b' },
   'kimi-code': { label: 'Kimi Code', color: '#10b981' },
   antigravity: { label: 'Antigravity', color: '#8b5cf6' },
+  codebuddy: { label: 'CodeBuddy', color: '#ec4899' },
 }
 
 /** Site-canonical display metadata for one harness id. */
@@ -49,6 +51,7 @@ export function harnessOfModel(model: string): HarnessId | null {
   if (id.startsWith('glm-5.3')) return 'zcode'
   if (id === 'grok-4.6') return 'grok'
   if (id === 'gemini-3.7-flash') return 'antigravity'
+  if (id === 'hy4-preview') return 'codebuddy'
   if (id.startsWith('gpt-') || id.startsWith('deepseek-v')) return 'codex'
   return null
 }
@@ -65,6 +68,7 @@ const PRETTY_MODEL: Record<string, string> = {
   'glm-5.3-flash': 'GLM-5.3 Flash',
   'grok-4.6': 'Grok 4.6',
   'gemini-3.7-flash': 'Gemini 3.7 Flash',
+  'hy4-preview': 'HY4 Preview',
 }
 
 /**
@@ -133,6 +137,7 @@ export function tierOptionLabel(tier: { model: string; effort: string }): string
 const BASE_MODEL_COLORS: Record<string, string> = {
   'grok-4.6': '#f59e0b',
   k3: '#10b981',
+  'hy4-preview': '#ec4899',
   'gemini-3.7-flash': '#8b5cf6',
   'glm-5.3': '#f5f5f5',
   'glm-5.3-flash': '#f6c453',
@@ -153,6 +158,7 @@ const EFFICIENCY_MODEL_COLORS: Record<string, string> = {
   'glm-5.3-flash': '#f6c453',
   'grok-4.6': '#f59e0b',
   'gemini-3.7-flash': '#a78bfa',
+  'hy4-preview': '#ec4899',
   'gpt-5.6-sol': '#fbbf24',
   'gpt-5.6-terra': '#3b82f6',
   'gpt-5.6-luna': '#d5dbe5',
