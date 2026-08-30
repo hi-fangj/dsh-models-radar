@@ -1,7 +1,7 @@
 {
   "name": "dsh-models-radar",
   "description": "Model capability radar for the DeepSeek Harness web GUI: a Settings tab that charts codexradar crowd-benchmark scores per model tier — task-composition bars, 7-day IQ trend, efficiency badges",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "license": "MIT",
   "repository": {
     "type": "git",
