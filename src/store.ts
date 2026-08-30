@@ -45,14 +45,20 @@ const FRESH_BENCHMARKS_MS = 60 * 60_000 // channel list: near-static
 const FRESH_EFFICIENCY_MS = 15 * 60_000 // overview + capability readout
 const FRESH_LEADERBOARD_MS = 15 * 60_000 // per-task composition
 const FRESH_HISTORY_MS = 60 * 60_000 // trend: upstream adds one point/hour
+const FRESH_CATALOG_MS = 60 * 60_000 // task catalog (repo/language): near-static
 const FRESH_RATINGS_MS = 15 * 60_000 // community ratings: site republishes every 5 min
 /** Wholesale cold-start window: a persisted snapshot this fresh is served without touching upstream. */
 const FRESH_SNAPSHOT_MS = FRESH_EFFICIENCY_MS
 
-/** Upstream dataset kinds; all but `benchmarks` are channel-scoped. */
-export type DatasetKind = 'benchmarks' | 'eff' | 'hist' | 'lb'
+/**
+ * Upstream dataset kinds; all but `benchmarks` are channel-scoped. `catalog`
+ * is the site's task catalog (source repo + language per task id) behind the
+ * heavy /table endpoint — auxiliary reading that must never block the channel
+ * (CONTEXT.md 任务源信息), so its flight failure only drops the badges/links.
+ */
+export type DatasetKind = 'benchmarks' | 'eff' | 'hist' | 'lb' | 'catalog'
 
-/** The four upstream datasets of one channel, each with its freshness window. */
+/** The five upstream datasets of one channel, each with its freshness window. */
 const channelDatasets = (
   benchmark: string,
 ): Array<{ key: string; kind: DatasetKind; windowMs: number }> => [
@@ -60,6 +66,7 @@ const channelDatasets = (
   { key: `eff:${benchmark}`, kind: 'eff', windowMs: FRESH_EFFICIENCY_MS },
   { key: `hist:${benchmark}`, kind: 'hist', windowMs: FRESH_HISTORY_MS },
   { key: `lb:${benchmark}`, kind: 'lb', windowMs: FRESH_LEADERBOARD_MS },
+  { key: `catalog:${benchmark}`, kind: 'catalog', windowMs: FRESH_CATALOG_MS },
 ]
 
 // ---------------------------------------------------------------------------
@@ -112,6 +119,13 @@ interface UpLbModel {
 
 interface UpLeaderboard {
   models?: UpLbModel[]
+}
+
+/** Loose upstream face of one task-catalog entry (CONTEXT.md 任务源信息). */
+interface UpCatalogTask {
+  id?: unknown
+  language?: unknown
+  repo?: unknown
 }
 
 /** One cached upstream dataset: `at` is the fetch-success moment backing its freshness window. */
@@ -319,12 +333,18 @@ export function createRadarDataStore(
   ): Promise<{ view: RadarView; upstreamHits: number }> => {
     const flights = await Promise.all(
       channelDatasets(benchmark).map((dataset) =>
-        resolveDataset(
-          dataset.key,
-          dataset.windowMs,
-          bypass,
-          () => upstream.fetchDataset(dataset.kind, benchmark),
-        ),
+        dataset.kind === 'catalog'
+          ? // Auxiliary catalog: a failed flight only drops the badges/links
+            // (contract.taskMeta stays absent) and is retried on a later
+            // request — never the stale-fallback path the essential
+            // datasets share.
+            resolveDataset(dataset.key, dataset.windowMs, bypass, () => upstream.fetchDataset(dataset.kind, benchmark)).catch(
+              (error: unknown) => {
+                console.error(`[${LOG}] task catalog unavailable:`, error instanceof Error ? error.message : String(error))
+                return undefined
+              },
+            )
+          : resolveDataset(dataset.key, dataset.windowMs, bypass, () => upstream.fetchDataset(dataset.kind, benchmark)),
       ),
     )
     const bench = flights[0].value as UpBenchmarks
@@ -387,20 +407,39 @@ export function createRadarDataStore(
     }
     tiers.sort((a, b) => b.iq - a.iq)
 
+    // Task catalog → id → {repo, language}: entries the task list links and
+    // badges read. Junk rows (missing id, neither field a string) are skipped.
+    let taskMeta: RadarView['taskMeta']
+    const catalogTasks = flights[4]?.value
+    if (Array.isArray(catalogTasks)) {
+      const meta: NonNullable<RadarView['taskMeta']> = {}
+      for (const task of catalogTasks as UpCatalogTask[]) {
+        if (typeof task?.id !== 'string' || task.id === '') continue
+        const item: { repo?: string; language?: string } = {}
+        if (typeof task.repo === 'string' && task.repo !== '') item.repo = task.repo
+        if (typeof task.language === 'string' && task.language !== '') item.language = task.language
+        if (item.repo !== undefined || item.language !== undefined) meta[task.id] = item
+      }
+      if (Object.keys(meta).length > 0) taskMeta = meta
+    }
+
     return {
       view: {
         benchmark,
         scoringMode: typeof eff.scoring_mode === 'string' ? eff.scoring_mode : undefined,
         scoreLabel: typeof eff.score_label === 'string' ? eff.score_label : '',
-        fetchedAt: new Date(Math.min(...flights.map((flight) => flight.at))).toISOString(),
+        fetchedAt: new Date(Math.min(...flights.filter(Boolean).map((flight) => flight.at))).toISOString(),
         sourceUpdatedAt: typeof eff.source_updated_at === 'string' ? eff.source_updated_at : undefined,
         defaultModel,
         channels,
         tiers,
         taskRates: Object.fromEntries(taskRates),
+        taskMeta,
         series,
       },
-      upstreamHits: flights.reduce((hits, flight) => hits + Number(flight.upstream), 0),
+      upstreamHits: flights
+        .filter(Boolean)
+        .reduce((hits, flight) => hits + Number(flight.upstream), 0),
     }
   }
 

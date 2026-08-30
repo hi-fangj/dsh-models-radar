@@ -56,9 +56,10 @@ A model capability radar plugin for the [DeepSeek Harness](https://github.com/de
   - DeepSWE: passed / split vote / failed
   - Pompeii: low / general / good / excellent F1 bands
   - attention-first sorting and local filters
+  - task titles link to their source repo (GitHub for DeepSWE), with the site's language badge after the title (Py/JS/TS/Go/Rust)
 - Efficiency metric badges: IQ, average cost, average duration, cache hit rate, 24-hour run count
 - **Capability popover**: opened from the composer readout; cross-base comparison plus the viewed tier's full details (badges, dual-window trend, task composition)
-- Refresh within freshness windows: overview & per-task composition 15 min, channel list & IQ trend 60 min; only expired datasets are refetched, everything else is served from cache (single-flight, zero upstream hits inside a window)
+- Refresh within freshness windows: overview & per-task composition 15 min, channel list / IQ trend / task source info 60 min; only expired datasets are refetched, everything else is served from cache (single-flight, zero upstream hits inside a window)
 - Manual refresh button in the footer (skips the windows) next to the last-fetch timestamp
 - Offline fallback to the latest persisted snapshot when the upstream API is unavailable
 - Chinese and English UI copy
@@ -185,6 +186,8 @@ Three tabs (composite / time / price) plot every tier on a log cost axis × line
 ### Task diagnostics
 
 DeepSWE uses the upstream's real majority-vote verdicts; Pompeii keeps continuous F1 semantics. Filtering, counting, and sorting all happen locally in the browser — switching filters adds no API requests.
+
+Task titles and language badges come from the site's task catalog (the `/table` endpoint, 60-minute window, proxied through the Host which keeps only the tasks array): a title with a source repo is an outbound link (GitHub for DeepSWE, dataset page for Pompeii), and the badge follows the site's vocabulary — Py/JS/TS/Go/Rust, unknown languages shown verbatim. A failed catalog fetch only drops the badges and links; the channel view is unaffected.
 
 ### Capability popover
 

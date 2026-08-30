@@ -81,6 +81,7 @@ const UPSTREAM_PATHS: Record<DatasetKind, (benchmark: string) => string> = {
   eff: (benchmark) => `/intelligence-efficiency?benchmark=${encodeURIComponent(benchmark)}`,
   hist: (benchmark) => `/iq-history?benchmark=${encodeURIComponent(benchmark)}`,
   lb: (benchmark) => `/leaderboard?benchmark=${encodeURIComponent(benchmark)}`,
+  catalog: (benchmark) => `/table?ui=1&benchmark=${encodeURIComponent(benchmark)}`,
 }
 
 /** Production upstream adapter: host-side fetch (ADR 0001 — never the browser). */
@@ -92,7 +93,11 @@ const codexRadarUpstream = (): RadarUpstream => ({
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     })
     if (!response.ok) throw new Error(`upstream ${pathAndQuery} → HTTP ${response.status}`)
-    return (await response.json()) as unknown
+    const payload = (await response.json()) as unknown
+    // The /table payload ships ~7MB of combos/cells next to its task catalog;
+    // only the tasks array is kept, so the store's dataset cache never
+    // retains the bulk of it.
+    return kind === 'catalog' ? (payload as { tasks?: unknown }).tasks : payload
   },
   async fetchRatings(window) {
     const pathAndQuery = `/api/model-ratings?view=public&window=${encodeURIComponent(window)}`

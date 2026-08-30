@@ -3,12 +3,13 @@ import { useEffect, useMemo, useState } from 'react'
 import type { MouseEvent } from 'react'
 import type { ModelRadarKey } from './locales.ts'
 import { fmt } from './locales.ts'
+import type { RadarView } from '../contract.ts'
 import { PersistentScrollFrame } from './ScrollFrame.tsx'
 import { bandColor, deltaSignal, iqBand, sliceRecentPoints, windowSummary } from './scoreMetrics.ts'
 import type { IqBand } from './scoreMetrics.ts'
 import { AXIS_STYLE, HGrid, PLOT_H, PLOT_W, PlotTip, viewBoxX } from './plotFrame.tsx'
 import { BAND_BOUNDARIES, buildSegments, fitRange } from './plotGeometry.ts'
-import { diagnoseTasks, taskMode, visibleOf } from './taskMetrics.ts'
+import { diagnoseTasks, taskLanguageBadge, taskMode, visibleOf } from './taskMetrics.ts'
 import type { TaskFilter, TaskRow } from './taskMetrics.ts'
 
 const PAD = { top: 16, right: 14, bottom: 26, left: 46 }
@@ -227,6 +228,7 @@ export function TaskBars({
   rows,
   benchmark,
   scoringMode,
+  taskMeta,
   t,
   scroll = true,
   collapsible = false,
@@ -234,6 +236,8 @@ export function TaskBars({
   rows: TaskRow[]
   benchmark: string
   scoringMode?: string
+  /** Task id → repo link + language (contract.taskMeta); absent → plain titles, no badges. */
+  taskMeta?: RadarView['taskMeta']
   t: Translate
   /** Wrap the list in the persistent scroll frame; false lets the parent viewport own scrolling. */
   scroll?: boolean
@@ -265,15 +269,42 @@ export function TaskBars({
 
   const bars = (
     <div className="dsh_mr_bars">
-      {shown.map(({ row: [taskId, rate], category }) => (
-        <div className="dsh_mr_barRow" key={taskId}>
-          <span className="dsh_mr_barLabel" title={taskId}>{taskId}</span>
-          <div className="dsh_mr_barTrack">
-            <div className="dsh_mr_barFill" data-band={category} style={{ width: `${clamp(rate, 0, 1) * 100}%` }} />
+      {shown.map(({ row: [taskId, rate], category }) => {
+        const meta = taskMeta?.[taskId]
+        const badge = taskLanguageBadge(meta?.language)
+        return (
+          <div className="dsh_mr_barRow" key={taskId}>
+            <span className="dsh_mr_barLabelCell">
+              {meta?.repo !== undefined ? (
+                <a
+                  className="dsh_mr_barLabel"
+                  href={meta.repo}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={taskId}
+                >
+                  {taskId}
+                </a>
+              ) : (
+                <span className="dsh_mr_barLabel" title={taskId}>{taskId}</span>
+              )}
+              {badge !== null && (
+                <span
+                  className="dsh_mr_langBadge"
+                  data-lang={badge.id}
+                  title={fmt(t('task.lang.title'), { language: badge.full })}
+                >
+                  {badge.label}
+                </span>
+              )}
+            </span>
+            <div className="dsh_mr_barTrack">
+              <div className="dsh_mr_barFill" data-band={category} style={{ width: `${clamp(rate, 0, 1) * 100}%` }} />
+            </div>
+            <span className="dsh_mr_barVal" data-band={category}>{Math.round(rate * 100)}%</span>
           </div>
-          <span className="dsh_mr_barVal" data-band={category}>{Math.round(rate * 100)}%</span>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 

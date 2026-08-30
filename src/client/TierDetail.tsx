@@ -122,6 +122,7 @@ export function TaskCard({
           rows={rows}
           benchmark={view.benchmark}
           scoringMode={view.scoringMode}
+          taskMeta={view.taskMeta}
           t={t}
           scroll={scroll}
           collapsible={!scroll}

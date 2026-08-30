@@ -7,7 +7,7 @@
  * one-linear-scan shape — via plain asserts, no React, no DOM.
  */
 import assert from 'node:assert/strict'
-import { diagnoseTasks, taskMode, visibleOf } from '../src/client/taskMetrics.ts'
+import { diagnoseTasks, taskLanguageBadge, taskMode, visibleOf } from '../src/client/taskMetrics.ts'
 
 // Mode dispatch: DeepSWE or an explicit binary-majority scoring mode is
 // majority vote; unknown benchmarks/modes fall to the continuous bands.
@@ -152,5 +152,21 @@ const proxied = new Proxy(rowsForProbe, {
 })
 diagnoseTasks(proxied, 'continuous')
 assert.ok(indexGets <= rowsForProbe.length + 2, `expected one pass over rows, saw ${indexGets} index reads`)
+
+// Language badge (site TASK_LANGUAGE_BADGES vocabulary): short label per known
+// language, the raw string for anything else, no badge without a language.
+assert.deepEqual(taskLanguageBadge('typescript'), { id: 'typescript', label: 'TS', full: 'TypeScript' })
+assert.deepEqual(taskLanguageBadge('python'), { id: 'python', label: 'Py', full: 'Python' })
+assert.deepEqual(taskLanguageBadge('javascript'), { id: 'javascript', label: 'JS', full: 'JavaScript' })
+assert.deepEqual(taskLanguageBadge('go'), { id: 'go', label: 'Go', full: 'Go' })
+assert.deepEqual(taskLanguageBadge('rust'), { id: 'rust', label: 'Rust', full: 'Rust' })
+// Case-insensitive match on the known vocabulary.
+assert.deepEqual(taskLanguageBadge('Python'), { id: 'python', label: 'Py', full: 'Python' })
+// Unknown language keeps its raw string (e.g. pompeii's vision tasks) under 'other'.
+assert.deepEqual(taskLanguageBadge('vision'), { id: 'other', label: 'vision', full: 'vision' })
+// Absent / blank → no badge at all.
+assert.equal(taskLanguageBadge(undefined), null)
+assert.equal(taskLanguageBadge(''), null)
+assert.equal(taskLanguageBadge('  '), null)
 
 console.log('taskMetrics tests passed')

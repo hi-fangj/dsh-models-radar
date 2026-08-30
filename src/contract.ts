@@ -59,6 +59,13 @@ export interface RadarView {
   tiers: RadarTier[]
   /** Tier key → `[taskId, rate, majorityPassed?]` rows. Third field is absent in legacy snapshots. */
   taskRates: Record<string, Array<[string, number, boolean?]>>
+  /**
+   * Task id → source metadata from the site's task catalog (CONTEXT.md 任务源信息):
+   * the repo link the task title opens and the task's programming language badge.
+   * Absent in legacy snapshots and whenever the catalog is unavailable — the UI
+   * degrades to a plain title.
+   */
+  taskMeta?: Record<string, { repo?: string; language?: string }>
   /** Tier key → `[isoTimestamp, iq]` points ascending (7-day hourly series). */
   series: Record<string, Array<[string, number]>>
 }

@@ -165,3 +165,35 @@ export function visibleOf(diagnostics: TaskDiagnostics, filter: TaskFilter): Rea
   const buckets = diagnostics.byCategory as Readonly<Partial<Record<TaskFilter, ReadonlyArray<EnrichedTaskRow>>>>
   return buckets[filter] ?? diagnostics.rows
 }
+
+// ---------------------------------------------------------------------------
+// Task language badge (CONTEXT.md 任务源信息): the site's TASK_LANGUAGE_BADGES
+// vocabulary — short label per known language, the raw string otherwise, and
+// no badge when the catalog publishes nothing.
+// ---------------------------------------------------------------------------
+
+/** One task language badge: `id` keys the pill's color, `label` is its text, `full` the title. */
+export interface TaskLanguageBadge {
+  id: string
+  label: string
+  full: string
+}
+
+/** The site's known language vocabulary: short pill label + full display name (site parity). */
+const LANGUAGES: Readonly<Record<string, { label: string; full: string }>> = {
+  python: { label: 'Py', full: 'Python' },
+  javascript: { label: 'JS', full: 'JavaScript' },
+  typescript: { label: 'TS', full: 'TypeScript' },
+  go: { label: 'Go', full: 'Go' },
+  rust: { label: 'Rust', full: 'Rust' },
+}
+
+/** The badge for one catalog `language` string, or null when there is nothing to show. */
+export function taskLanguageBadge(language: string | undefined): TaskLanguageBadge | null {
+  const full = language?.trim() ?? ''
+  if (full === '') return null
+  const known = LANGUAGES[full.toLowerCase()]
+  return known !== undefined
+    ? { id: full.toLowerCase(), label: known.label, full: known.full }
+    : { id: 'other', label: full, full }
+}

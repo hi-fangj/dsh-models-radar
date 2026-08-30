@@ -467,6 +467,13 @@ span.dsh_mr_ovChevron { cursor: default; }
   gap: 8px;
   min-width: 0;
 }
+/* Label + language badge: the id truncates, the badge never does. */
+.dsh_mr_barLabelCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
 .dsh_mr_barLabel {
   font-size: 11.5px;
   color: var(--dsw-alias-label-secondary);
@@ -475,6 +482,31 @@ span.dsh_mr_ovChevron { cursor: default; }
   text-overflow: ellipsis;
   direction: ltr;
 }
+/* With a catalog repo the title is a link: quiet like the label, brand-tinted
+   on hover (same treatment as .dsh_mr_link). */
+a.dsh_mr_barLabel { cursor: pointer; text-decoration: none; }
+a.dsh_mr_barLabel:hover { color: var(--dsw-alias-brand-primary); text-decoration: underline; }
+/* Language pill (site .task-lang parity): tinted border/fill over the
+   language color, site palette on data-lang, neutral for other languages. */
+.dsh_mr_langBadge {
+  --dsh-mr-lang-color: var(--dsw-alias-label-tertiary);
+  flex: none;
+  padding: 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--dsh-mr-lang-color) 58%, var(--dsw-alias-border-l2));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--dsh-mr-lang-color) 12%, transparent);
+  color: var(--dsh-mr-lang-color);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.15px;
+  white-space: nowrap;
+}
+.dsh_mr_langBadge[data-lang='python'] { --dsh-mr-lang-color: #60a5fa; }
+.dsh_mr_langBadge[data-lang='javascript'] { --dsh-mr-lang-color: #facc15; }
+.dsh_mr_langBadge[data-lang='typescript'] { --dsh-mr-lang-color: #a78bfa; }
+.dsh_mr_langBadge[data-lang='go'] { --dsh-mr-lang-color: #22d3ee; }
+.dsh_mr_langBadge[data-lang='rust'] { --dsh-mr-lang-color: #fb923c; }
 .dsh_mr_barTrack {
   height: 8px;
   border-radius: 4px;

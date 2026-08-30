@@ -58,6 +58,15 @@ const payloadFor = (kind) => {
       return { m1: [{ ts: '2026-08-28T00:00:00Z', score: 88 }] }
     case 'lb':
       return { models: [{ model: 'm1', effort: 'high', tasks: { t1: { majority_pass: true, score_rate: 0.9 } } }] }
+    case 'catalog':
+      // The adapter's sliced task catalog: id → repo link + language badge.
+      return [
+        { id: 't1', language: 'typescript', repo: 'https://github.com/flightcontrolhq/superjson' },
+        { id: 't2', language: 'python' },
+        { id: 't3' },
+        { language: 'go', repo: 'https://github.com/beevik/etree' },
+        42,
+      ]
     default:
       throw new Error(`unexpected kind ${kind}`)
   }
@@ -190,7 +199,7 @@ test('并发同频道请求只产生一组上游请求（single-flight）', asyn
   const [a, b] = await Promise.all([first, second])
   assert.deepEqual(
     [...upstream.calls].sort(),
-    ['benchmarks:deep-swe', 'eff:deep-swe', 'hist:deep-swe', 'lb:deep-swe'],
+    ['benchmarks:deep-swe', 'catalog:deep-swe', 'eff:deep-swe', 'hist:deep-swe', 'lb:deep-swe'],
   )
   assert.ok(a.ok && b.ok)
   // Joiners count the shared upstream work (preserved semantics): both non-throttled.
@@ -203,6 +212,11 @@ test('并发同频道请求只产生一组上游请求（single-flight）', asyn
   // Series attach via the exact-tier → base-model fallback; task rows carry majority vote.
   assert.deepEqual(a.data.series['m1@high'], [['2026-08-28T00:00:00Z', 88]])
   assert.deepEqual(a.data.taskRates['m1@high'], [['t1', 0.9, true]])
+  // Catalog → taskMeta: usable entries kept, junk rows (no id / no fields) skipped.
+  assert.deepEqual(a.data.taskMeta, {
+    t1: { repo: 'https://github.com/flightcontrolhq/superjson', language: 'typescript' },
+    t2: { language: 'python' },
+  })
   // Cost sample count flows through for the site-format tooltip.
   assert.equal(a.data.tiers[0].tokenSamples, 8)
 })
@@ -214,7 +228,7 @@ test('bypass 仍并入 in-flight（手动刷新不重复打上游）', async () 
   const manual = store.get({ benchmark: 'deep-swe', bypass: true })
   upstream.releaseAll()
   const [a, b] = await Promise.all([normal, manual])
-  assert.equal(upstream.calls.length, 4)
+  assert.equal(upstream.calls.length, 5)
   assert.ok(a.ok && b.ok)
   // Starter and bypass joiner alike report non-throttled (upstream work happened).
   assert.equal(a.throttled, undefined)
@@ -317,10 +331,10 @@ test('快路径：窗口内零上游、冷启动读盘、快照视图再窗口�
     const upstream = fakeUpstream({ gated: false })
     const store = createRadarDataStore(upstream, fakeSnapshots(), clock)
     const first = await store.get({ benchmark: 'deep-swe', bypass: true })
-    assert.equal(upstream.calls.length, 4)
+    assert.equal(upstream.calls.length, 5)
     clock.advance(10 * 60_000)
     const second = await store.get({ benchmark: 'deep-swe', bypass: false })
-    assert.equal(upstream.calls.length, 4)
+    assert.equal(upstream.calls.length, 5)
     assert.ok(second.ok && second.fresh && second.throttled)
     assert.equal(second.data, first.data)
   }
@@ -347,7 +361,8 @@ test('快路径：窗口内零上游、冷启动读盘、快照视图再窗口�
     // did not backfill the dataset cache.
     clock.advance(16 * 60_000)
     const live = await store.get({ benchmark: 'deep-swe', bypass: false })
-    assert.equal(upstream.calls.length, 4)
+    // First live assembly of this store: all five datasets.
+    assert.equal(upstream.calls.length, 5)
     assert.ok(live.ok)
   }
   // A persisted snapshot older than its window does not serve cold.
@@ -358,7 +373,7 @@ test('快路径：窗口内零上游、冷启动读盘、快照视图再窗口�
     snapshots.store.set('deep-swe', savedView(new Date(clock.now() - 16 * 60_000).toISOString()))
     const store = createRadarDataStore(upstream, snapshots, clock)
     const live = await store.get({ benchmark: 'deep-swe', bypass: false })
-    assert.equal(upstream.calls.length, 4)
+    assert.equal(upstream.calls.length, 5)
     assert.ok(live.ok && live.fresh && live.throttled === undefined)
   }
 })
@@ -370,7 +385,7 @@ test('bypass 绕过新鲜窗口强制全量重拉', async () => {
   await store.get({ benchmark: 'deep-swe', bypass: true })
   clock.advance(1_000) // still deep inside every window
   const manual = await store.get({ benchmark: 'deep-swe', bypass: true })
-  assert.equal(upstream.calls.length, 8)
+  assert.equal(upstream.calls.length, 10)
   assert.ok(manual.ok && manual.throttled === undefined)
 })
 
@@ -379,9 +394,9 @@ test('分层窗口：只有过期的数据集被重拉（mixed assembly）', asy
   const upstream = fakeUpstream({ gated: false })
   const store = createRadarDataStore(upstream, fakeSnapshots(), clock)
   const first = await store.get({ benchmark: 'deep-swe', bypass: true })
-  clock.advance(16 * 60_000) // eff + lb (15min) stale; benchmarks + hist (60min) fresh
+  clock.advance(16 * 60_000) // eff + lb (15min) stale; benchmarks + hist + catalog (60min) fresh
   const mixed = await store.get({ benchmark: 'deep-swe', bypass: false })
-  assert.deepEqual(upstream.calls.slice(4), ['eff:deep-swe', 'lb:deep-swe'])
+  assert.deepEqual(upstream.calls.slice(5), ['eff:deep-swe', 'lb:deep-swe'])
   assert.ok(mixed.ok && mixed.fresh)
   assert.equal(mixed.throttled, undefined) // this request did hit upstream
   // fetchedAt honestly reports the oldest dataset moment (still the first fetch).
@@ -429,6 +444,41 @@ test('schema 容错：良性站点侧变更不弄崩视图组装', async () => {
   assert.equal(response.data.tiers[1].avgPrice, null)
   assert.deepEqual(response.data.taskRates, {})
   assert.deepEqual(response.data.series, {}) // unexpected history shape → no series
+  assert.equal(response.data.taskMeta, undefined) // catalog non-array → no badges/links
+})
+
+test('任务目录尽力而为：失败只丢徽章/链接，不阻塞频道', async () => {
+  const upstream = {
+    calls: [],
+    async fetchDataset(kind) {
+      this.calls.push(kind)
+      switch (kind) {
+        case 'benchmarks':
+          return { benchmarks: [{ id: 'deep-swe', title: 'DeepSWE' }] }
+        case 'eff':
+          return { points: [{ model: 'm1', effort: 'high', iq: 90, total: 2, passed: 1 }] }
+        case 'hist':
+          return {}
+        case 'lb':
+          return { models: [{ model: 'm1', effort: 'high', tasks: { t1: { majority_pass: true } } }] }
+        case 'catalog':
+          throw new Error('table upstream 500')
+        default:
+          return {}
+      }
+    },
+    async fetchRatings() {
+      return {}
+    },
+  }
+  const store = createRadarDataStore(upstream, fakeSnapshots(), fakeClock())
+  const response = await store.get({ benchmark: 'deep-swe', bypass: true })
+  // The channel view assembles normally despite the catalog failure...
+  assert.ok(response.ok && response.fresh)
+  assert.deepEqual(response.data.taskRates['m1@high'], [['t1', 1, true]])
+  // ...with the catalog reading simply absent.
+  assert.equal(response.data.taskMeta, undefined)
+  assert.ok(upstream.calls.includes('catalog'))
 })
 
 // ---------------------------------------------------------------------------
