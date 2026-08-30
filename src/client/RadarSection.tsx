@@ -16,17 +16,20 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { RadarPayload, RadarView } from '../contract.ts'
+import type { CommunityRatingsPayload, RadarPayload, RadarView, RatingsWindow } from '../contract.ts'
 import { SOURCE_SITE_URL } from '../contract.ts'
 import { fmt } from './locales.ts'
 import { TierOverview } from './Overview.tsx'
 import { CostScatterCard } from './costScatter.tsx'
+import { RatingsCard } from './ratingsCard.tsx'
 import { matchTier } from './tierMatch.ts'
 import { TaskCard, TierBadges, TrendCard } from './TierDetail.tsx'
 
-/** Injected business face: the same-origin data loader. */
+/** Injected business face: the same-origin data loaders. */
 export interface RadarInjected {
   loadData: (benchmark: string, signal?: AbortSignal, bypass?: boolean) => Promise<RadarPayload>
+  /** The community-ratings loader (global data, one payload per window). */
+  loadRatings: (window: RatingsWindow, signal?: AbortSignal, bypass?: boolean) => Promise<CommunityRatingsPayload>
 }
 
 /** Full section props: injected face + the locale seat (`t`). */
@@ -34,6 +37,10 @@ export type RadarSectionProps = InjectFace<RadarInjected> & PropsLocale<'model-r
 
 const LS_BENCH = 'model-radar:benchmark'
 const tierStorageKey = (benchmark: string): string => `model-radar:tier:${benchmark}`
+const RATINGS_LS = 'model-radar:ratings-window'
+
+const readRatingsWindow = (): RatingsWindow =>
+  typeof localStorage !== 'undefined' && localStorage.getItem(RATINGS_LS) === '24h' ? '24h' : '7d'
 
 const FALLBACK_CHANNELS: RadarView['channels'] = [
   { id: 'deep-swe', title: 'DeepSWE', scoreLabel: 'Pass rate', isDefault: true },
@@ -45,7 +52,7 @@ const FALLBACK_CHANNELS: RadarView['channels'] = [
  * @param props - the data loader and `t`.
  * @returns the section element tree.
  */
-export function RadarSection({ loadData, t }: RadarSectionProps) {
+export function RadarSection({ loadData, loadRatings, t }: RadarSectionProps) {
   const [benchmark, setBenchmark] = useState<string>(() => localStorage.getItem(LS_BENCH) ?? 'deep-swe')
   const [payload, setPayload] = useState<RadarPayload | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -115,6 +122,61 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
 
   const channels = view !== null && view.channels.length > 0 ? view.channels : FALLBACK_CHANNELS
   const seriesPoints = tierKey !== null ? (view?.series[tierKey] ?? []) : []
+
+  // -------------------------------------------------------------------------
+  // Community ratings (社区体感分): global data, independent of the channel.
+  // Each window is its own dataset with its own 15-minute freshness window
+  // server-side; the active window loads on mount/switch, the other lazily on
+  // first switch. Payloads cache per window so tab switches render instantly.
+  // -------------------------------------------------------------------------
+  const [ratingsWin, setRatingsWin] = useState<RatingsWindow>(readRatingsWindow)
+  const [ratings, setRatings] = useState<Partial<Record<RatingsWindow, CommunityRatingsPayload>>>({})
+  const [ratingsErrors, setRatingsErrors] = useState<Partial<Record<RatingsWindow, string>>>({})
+  const [ratingsLoading, setRatingsLoading] = useState<Partial<Record<RatingsWindow, boolean>>>({})
+  const ratingsSeqs = useRef<Partial<Record<RatingsWindow, number>>>({})
+
+  const loadRatingsFor = useCallback(
+    async (win: RatingsWindow, bypass = false) => {
+      const seq = (ratingsSeqs.current[win] ?? 0) + 1
+      ratingsSeqs.current[win] = seq
+      setRatingsLoading((prev) => ({ ...prev, [win]: true }))
+      try {
+        const response = await loadRatings(win, undefined, bypass)
+        if (ratingsSeqs.current[win] !== seq) return
+        if (response.ok) {
+          setRatings((prev) => ({ ...prev, [win]: response }))
+          setRatingsErrors((prev) => ({ ...prev, [win]: undefined }))
+        } else {
+          setRatingsErrors((prev) => ({ ...prev, [win]: response.error }))
+        }
+      } catch (cause) {
+        if (ratingsSeqs.current[win] !== seq) return
+        setRatingsErrors((prev) => ({
+          ...prev,
+          [win]: cause instanceof Error ? cause.message : String(cause),
+        }))
+      } finally {
+        if (ratingsSeqs.current[win] === seq) setRatingsLoading((prev) => ({ ...prev, [win]: false }))
+      }
+    },
+    [loadRatings],
+  )
+
+  // Mount and window switches: fetch the active window (the host serves it
+  // from its freshness cache when still current — re-requests cost nothing).
+  useEffect(() => {
+    void loadRatingsFor(ratingsWin)
+  }, [ratingsWin, loadRatingsFor])
+
+  const switchRatingsWindow = (win: RatingsWindow): void => {
+    if (win === ratingsWin) return
+    try {
+      localStorage.setItem(RATINGS_LS, win)
+    } catch {
+      // Persistence is best-effort; the tab still switches for this visit.
+    }
+    setRatingsWin(win)
+  }
 
   return (
     <section className="dsh_mr_section">
@@ -193,6 +255,17 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
 
           <CostScatterCard view={view} t={t} />
 
+          <RatingsCard
+            win={ratingsWin}
+            onWinChange={switchRatingsWindow}
+            payloads={ratings}
+            errors={ratingsErrors}
+            loading={ratingsLoading}
+            onRetry={() => void loadRatingsFor(ratingsWin, true)}
+            selectedKey={tierKey}
+            t={t}
+          />
+
           <div className="dsh_mr_footer">
             <span
               className="dsh_mr_dot"
@@ -212,7 +285,10 @@ export function RadarSection({ loadData, t }: RadarSectionProps) {
             <button
               type="button"
               className="dsh_mr_refresh"
-              onClick={() => void load(benchmark, true)}
+              onClick={() => {
+                void load(benchmark, true)
+                void loadRatingsFor(ratingsWin, true)
+              }}
               disabled={loading}
             >
               {t('action.refresh')}

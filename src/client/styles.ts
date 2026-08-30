@@ -547,8 +547,8 @@ span.dsh_mr_ovChevron { cursor: default; }
 .dsh_mr_trendStat strong[data-dir="up"] { color: var(--dsw-alias-state-success-primary); }
 .dsh_mr_trendStat strong[data-dir="down"] { color: var(--dsw-alias-state-error-primary); }
 .dsh_mr_trendStat strong[data-dir="flat"] { color: var(--dsw-alias-label-secondary); }
-.dsh_mr_trendWrap { position: relative; min-width: 0; }
-.dsh_mr_trendWrap svg { display: block; width: 100%; height: auto; }
+.dsh_mr_trendWrap, .dsh_mr_ratingsWrap { position: relative; min-width: 0; }
+.dsh_mr_trendWrap svg, .dsh_mr_ratingsWrap svg { display: block; width: 100%; height: auto; }
 /* Tab-switched card bodies (trend windows, cost metrics): the in-house
    segmented control above a single active panel. */
 .dsh_mr_tabBody { display: flex; flex-direction: column; gap: 10px; }
@@ -659,7 +659,9 @@ span.dsh_mr_ovChevron { cursor: default; }
   position: absolute;
   pointer-events: none;
   transform: translate(-50%, -130%);
-  background: var(--dsw-alias-bg-overlay);
+  /* White surface (cost/IQ/score hover tips): layer-1 is pure white in the
+     light theme and stays readable against label-primary in the dark theme. */
+  background: var(--dsw-alias-bg-layer-1);
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 7px;
   padding: 3px 8px;

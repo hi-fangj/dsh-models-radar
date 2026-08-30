@@ -11,7 +11,13 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
-import type { RadarPayload, RadarResponse } from '../contract.ts'
+import type {
+  CommunityRatingsPayload,
+  CommunityRatingsResponse,
+  RadarPayload,
+  RadarResponse,
+  RatingsWindow,
+} from '../contract.ts'
 import { NS, en, zh } from './locales.ts'
 import { adoptStyles } from './styles.ts'
 import { LiveCapability, type LiveCapabilityInjected } from './LiveCapability.tsx'
@@ -28,6 +34,22 @@ async function loadData(benchmark: string, signal?: AbortSignal, bypass = false)
     `/model-radar/api/data?benchmark=${encodeURIComponent(benchmark)}` + (bypass ? '&bypass=1' : '')
   const response = await fetch(url, { signal })
   const body = (await response.json()) as RadarResponse
+  if (!response.ok || body.ok !== true) {
+    throw new Error(body.ok === false ? body.error : `HTTP ${response.status}`)
+  }
+  return body
+}
+
+/** Same-origin ratings loader: one response per rolling window (CONTEXT.md 社区体感分). */
+async function loadRatings(
+  window: RatingsWindow,
+  signal?: AbortSignal,
+  bypass = false,
+): Promise<CommunityRatingsPayload> {
+  const url =
+    `/model-radar/api/ratings?window=${encodeURIComponent(window)}` + (bypass ? '&bypass=1' : '')
+  const response = await fetch(url, { signal })
+  const body = (await response.json()) as CommunityRatingsResponse
   if (!response.ok || body.ok !== true) {
     throw new Error(body.ok === false ? body.error : `HTTP ${response.status}`)
   }
@@ -59,7 +81,7 @@ export function apply(ctx: ClientContext): void {
     // in unreleased dev shells). "data" is the closest attributed glyph.
     icon: 'data',
     locale: NS,
-    inject: (): RadarInjected => ({ loadData }),
+    inject: (): RadarInjected => ({ loadData, loadRatings }),
   }, RadarSection))
 
   // The plugin-configuration card (设置 → 插件 → 可配置插件). The tab

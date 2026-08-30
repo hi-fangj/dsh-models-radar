@@ -36,6 +36,7 @@ A model capability radar plugin for the [DeepSeek Harness](https://github.com/de
 - **Best-effort-per-base ranking.** The capability overview groups by base model with a fixed `0–110` absolute-scale magnitude bar and a 24h trend signal per row; expand a row for the base's full reasoning-effort ladder.
 - **24h / 7d dual-window IQ trend.** Tab between two time windows, each independently scaled with its own full stats (net change, low, average, high); the curve is colored by capability band.
 - **Cost × IQ from three angles.** Tabs for composite cost (the site's own 2.5×-price-for-1.35×-speed trade-off, normalized per chart), time cost, and price cost; color = base, shape = reasoning effort, same-base tiers joined by ladder lines. Upper-left = more efficient. Hovering surfaces the site's three-line reading: attribution (display name · billing · harness · effort), IQ with its pass/total, and the active metric with sample counts.
+- **Community ratings.** The codexradar.com main-site community's 0–10 experience scores over rolling 7-day / 24-hour windows as a bar chart: grouped by base model with efforts ordered within each group, color = base, the selected tier highlighted (≈ marks an approximate match), and unrated slots kept as explicit placeholders. Each window carries its own freshness window; the data is global and independent of the benchmark channels.
 - **Live readout beside the composer.** Exact `model@reasoningEffort` matching through DSH's official per-session model directory, updating immediately on model switches; click it to open the capability popover for cross-base comparison.
 - **Lightweight, credential-free, offline-tolerant.** The browser never hits upstream directly (same-origin host proxy), freshness windows mean zero upstream requests inside a window, the latest local snapshot serves as fallback, and no credentials are requested or submitted.
 
@@ -47,6 +48,7 @@ A model capability radar plugin for the [DeepSeek Harness](https://github.com/de
 - Fixed `0–110` IQ scale with consistent capability-band semantics across channels
 - **Trend tabs**: last 24 hours / last 7 days, each independently y-scaled with full stats; the choice persists
 - **Cost × IQ card**: composite / time / price tabs on a log x-axis, model filter chips synced across tabs, codex-run DSV4 bases hidden by default (site parity)
+- **Community ratings card**: 7-day / 24-hour tabs (choice remembered), identical slot layout across windows, an independent 15-minute freshness window each; settings page only, never the popover
 - Two benchmark channels:
   - `deep-swe`: code-repair tasks, binary-majority scoring
   - `pompeii-adjacency`: visual reconstruction tasks, continuous Adjacency F1

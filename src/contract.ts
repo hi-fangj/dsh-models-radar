@@ -83,3 +83,51 @@ export interface RadarFailure {
 }
 
 export type RadarResponse = RadarPayload | RadarFailure
+
+/** Community-ratings rolling window of the codexradar main site. */
+export type RatingsWindow = '7d' | '24h'
+
+/** One model×effort tier's community sentiment reading. */
+export interface CommunityRatingTier {
+  /** Same canonical tier key as RadarTier: `${model}@${effort}`. */
+  key: string
+  /** Base model id as the site spells it, e.g. `gpt-5.6-sol`. */
+  model: string
+  /** Reasoning-effort tier, e.g. `high`, `xhigh`. */
+  effort: string
+  /** 0–10 average experience score; null when nobody rated in the window. */
+  average: number | null
+  /** Number of community ratings in the window. */
+  count: number
+}
+
+/** The normalized community-ratings view model one ratings fetch produces. */
+export interface CommunityRatings {
+  window: RatingsWindow
+  /** ISO timestamp of this refresh attempt's success. */
+  fetchedAt: string
+  /** Upstream publish timestamp, when published. */
+  updatedAt?: string
+  /** Tiers in the site's own order (group, then effort). */
+  tiers: CommunityRatingTier[]
+}
+
+export interface CommunityRatingsPayload {
+  ok: true
+  fresh: boolean
+  /** Served entirely from the freshness window (zero upstream hits this request). */
+  throttled?: boolean
+  stale?: boolean
+  /** Why the live refresh failed (present only with `stale`). */
+  notice?: string
+  fetchedAt?: string
+  data: CommunityRatings | null
+}
+
+/** Failed ratings response: no snapshot existed to fall back to. */
+export interface CommunityRatingsFailure {
+  ok: false
+  error: string
+}
+
+export type CommunityRatingsResponse = CommunityRatingsPayload | CommunityRatingsFailure

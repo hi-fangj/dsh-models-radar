@@ -64,6 +64,22 @@ const payloadFor = (kind) => {
 }
 
 /**
+ * Raw community-ratings payload (the main-site shape): entries carry dotted
+ * tier ids, plus junk rows that normalization must tolerate.
+ */
+const ratingsPayload = () => ({
+  ok: true,
+  updated_at: '2026-08-29T14:15:39.742Z',
+  models: [
+    { id: 'gpt-5.6-sol-ultra', average: 6.8, count: 126 },
+    { id: 'gpt-5.6-sol-max', average: 7.3, count: 123 },
+    { id: 'gpt-5.5-xhigh', average: 6.7, count: 22 },
+    { id: 'junk-entry', average: 5, count: 1 },
+    { average: 3, count: 1 },
+  ],
+})
+
+/**
  * Fake upstream: records every fetch (as `kind:benchmark`), can hold all
  * fetches behind a gate until releaseAll(), and can fail every fetch until
  * clearFailure() — enough to interleave requests deterministically.
@@ -72,6 +88,7 @@ const fakeUpstream = ({ gated = true } = {}) => {
   const calls = []
   const pending = []
   let failure = null
+  let ratings = ratingsPayload()
   return {
     calls,
     failWith: (message) => {
@@ -83,11 +100,20 @@ const fakeUpstream = ({ gated = true } = {}) => {
     releaseAll: () => {
       for (const resolve of pending.splice(0)) resolve()
     },
+    setRatingsPayload: (next) => {
+      ratings = next
+    },
     async fetchDataset(kind, benchmark) {
       calls.push(`${kind}:${benchmark}`)
       if (failure !== null) throw new Error(failure)
       if (gated) await new Promise((resolve) => pending.push(resolve))
       return payloadFor(kind)
+    },
+    async fetchRatings(window) {
+      calls.push(`ratings:${window}`)
+      if (failure !== null) throw new Error(failure)
+      if (gated) await new Promise((resolve) => pending.push(resolve))
+      return ratings
     },
   }
 }
@@ -95,23 +121,36 @@ const fakeUpstream = ({ gated = true } = {}) => {
 /** In-memory snapshot stand-in: read/commit plus commit-gate and failure hooks for ordering tests. */
 const fakeSnapshots = () => {
   const store = new Map()
+  const ratingsStore = new Map()
   const commitsLog = []
   let blocked = null
   let failingCommits = 0
+  const gate = async () => {
+    if (failingCommits > 0) {
+      failingCommits--
+      throw new Error('disk full')
+    }
+    if (blocked !== null) await new Promise((resolve) => blocked.push(resolve))
+  }
   return {
     store,
+    ratingsStore,
     commitsLog,
     async read(benchmark) {
       return store.get(benchmark)
     },
     async commit(benchmark, view, timelineLine) {
-      if (failingCommits > 0) {
-        failingCommits--
-        throw new Error('disk full')
-      }
-      if (blocked !== null) await new Promise((resolve) => blocked.push(resolve))
+      await gate()
       store.set(benchmark, view)
       commitsLog.push({ benchmark, fetchedAt: view.fetchedAt, defaultModel: view.defaultModel, timelineLine })
+    },
+    async readRatings(window) {
+      return ratingsStore.get(window)
+    },
+    async commitRatings(window, ratings) {
+      await gate()
+      ratingsStore.set(window, ratings)
+      commitsLog.push({ window, fetchedAt: ratings.fetchedAt })
     },
     blockCommits: () => {
       blocked = []
@@ -372,6 +411,9 @@ test('schema 容错：良性站点侧变更不弄崩视图组装', async () => {
           return {}
       }
     },
+    async fetchRatings() {
+      return {}
+    },
   }
   const store = createRadarDataStore(upstream, fakeSnapshots(), fakeClock())
   const response = await store.get({ benchmark: 'deep-swe', bypass: true })
@@ -387,6 +429,145 @@ test('schema 容错：良性站点侧变更不弄崩视图组装', async () => {
   assert.equal(response.data.tiers[1].avgPrice, null)
   assert.deepEqual(response.data.taskRates, {})
   assert.deepEqual(response.data.series, {}) // unexpected history shape → no series
+})
+
+// ---------------------------------------------------------------------------
+// Community ratings (社区体感分): global datasets, one per window.
+// ---------------------------------------------------------------------------
+
+test('ratings 归一化：dotted id → 档位键，junk 行跳过', async () => {
+  const upstream = fakeUpstream({ gated: false })
+  const store = createRadarDataStore(upstream, fakeSnapshots(), fakeClock())
+  const response = await store.getRatings({ window: '7d', bypass: true })
+  assert.ok(response.ok && response.fresh)
+  assert.equal(response.data.window, '7d')
+  assert.equal(response.data.updatedAt, '2026-08-29T14:15:39.742Z')
+  assert.deepEqual(
+    response.data.tiers.map((tier) => [tier.key, tier.average, tier.count]),
+    [
+      ['gpt-5.6-sol@ultra', 6.8, 126],
+      ['gpt-5.6-sol@max', 7.3, 123],
+      ['gpt-5.5@xhigh', 6.7, 22],
+    ],
+  )
+})
+
+test('ratings 单飞行 + 新鲜窗口：并发一次拉取、窗口内零上游', async () => {
+  const clock = fakeClock()
+  const upstream = fakeUpstream()
+  const store = createRadarDataStore(upstream, fakeSnapshots(), clock)
+  const first = store.getRatings({ window: '24h', bypass: true })
+  const second = store.getRatings({ window: '24h', bypass: true })
+  upstream.releaseAll()
+  const [a, b] = await Promise.all([first, second])
+  assert.deepEqual(upstream.calls, ['ratings:24h'])
+  assert.ok(a.ok && b.ok)
+  assert.equal(a.throttled, undefined) // this request did the upstream work
+  assert.equal(b.throttled, undefined) // joiners share it (preserved semantics)
+  // Windows are independent datasets: 7d is a separate fetch.
+  const otherPending = store.getRatings({ window: '7d', bypass: true })
+  upstream.releaseAll()
+  const other = await otherPending
+  assert.deepEqual(upstream.calls, ['ratings:24h', 'ratings:7d'])
+  assert.ok(other.ok && other.data.window === '7d')
+  // Back to 24h inside its window → wholesale serve, zero upstream.
+  clock.advance(10 * 60_000)
+  const cached = await store.getRatings({ window: '24h', bypass: false })
+  assert.deepEqual(upstream.calls, ['ratings:24h', 'ratings:7d'])
+  assert.ok(cached.ok && cached.throttled)
+  assert.equal(cached.data, a.data)
+})
+
+test('ratings 失败兜底：内存 → 磁盘快照 → 失败响应；bypass 强制重拉', async () => {
+  // (a) memory fallback after a prior success
+  {
+    const clock = fakeClock()
+    const upstream = fakeUpstream({ gated: false })
+    const store = createRadarDataStore(upstream, fakeSnapshots(), clock)
+    const good = await store.getRatings({ window: '7d', bypass: true })
+    assert.ok(good.ok)
+    upstream.failWith('ratings upstream 500')
+    clock.advance(16 * 60_000)
+    const fallback = await store.getRatings({ window: '7d', bypass: false })
+    assert.equal(fallback.ok, true)
+    assert.equal(fallback.fresh, false)
+    assert.equal(fallback.stale, true)
+    assert.equal(fallback.notice, 'ratings upstream 500')
+    assert.equal(fallback.data, good.data)
+  }
+  // (b) cold start with only a disk snapshot; past the window it goes live again
+  {
+    const clock = fakeClock()
+    const upstream = fakeUpstream({ gated: false })
+    const snapshots = fakeSnapshots()
+    snapshots.ratingsStore.set('24h', {
+      window: '24h',
+      fetchedAt: new Date(clock.now() - 5 * 60_000).toISOString(),
+      tiers: [{ key: 'm1@high', model: 'm1', effort: 'high', average: 6, count: 2 }],
+    })
+    const store = createRadarDataStore(upstream, snapshots, clock)
+    const served = await store.getRatings({ window: '24h', bypass: false })
+    assert.equal(upstream.calls.length, 0)
+    assert.ok(served.ok && served.throttled)
+    clock.advance(16 * 60_000)
+    const live = await store.getRatings({ window: '24h', bypass: false })
+    assert.deepEqual(upstream.calls, ['ratings:24h'])
+    assert.ok(live.ok && live.fresh)
+  }
+  // (c) nothing anywhere → the failure the route maps to 502
+  {
+    const upstream = fakeUpstream({ gated: false })
+    const store = createRadarDataStore(upstream, fakeSnapshots(), fakeClock())
+    upstream.failWith('ratings upstream 500')
+    const failure = await store.getRatings({ window: '7d', bypass: false })
+    assert.equal(failure.ok, false)
+    assert.equal(failure.error, 'ratings upstream 500')
+  }
+  // (d) manual refresh bypasses the window even deep inside it
+  {
+    const clock = fakeClock()
+    const upstream = fakeUpstream({ gated: false })
+    const store = createRadarDataStore(upstream, fakeSnapshots(), clock)
+    await store.getRatings({ window: '7d', bypass: true })
+    clock.advance(1_000)
+    const manual = await store.getRatings({ window: '7d', bypass: true })
+    assert.deepEqual(upstream.calls, ['ratings:7d', 'ratings:7d'])
+    assert.ok(manual.ok && manual.throttled === undefined)
+  }
+})
+
+test('ratings 快照：成功后落盘、内容不变不重写、提交失败不失败响应', async () => {
+  const clock = fakeClock()
+  const upstream = fakeUpstream({ gated: false })
+  const snapshots = fakeSnapshots()
+  const store = createRadarDataStore(upstream, snapshots, clock)
+  const first = await store.getRatings({ window: '7d', bypass: true })
+  assert.ok(first.ok)
+  assert.equal(snapshots.commitsLog.length, 1) // first success persisted
+  assert.ok(snapshots.ratingsStore.get('7d'))
+  // Cache expired, identical content → the refetch happens but the hash-dedupe
+  // skips the snapshot rewrite.
+  clock.advance(16 * 60_000)
+  const second = await store.getRatings({ window: '7d', bypass: false })
+  assert.ok(second.ok && second.throttled === undefined) // this request went live
+  assert.deepEqual(second.data.tiers, first.data.tiers) // identical content
+  assert.equal(snapshots.commitsLog.length, 1)
+  // A failed commit is diagnostic: the response still succeeds...
+  clock.advance(16 * 60_000)
+  upstream.setRatingsPayload({
+    ...ratingsPayload(),
+    models: [...ratingsPayload().models, { id: 'gpt-5.5-high', average: 5.8, count: 17 }],
+  })
+  snapshots.failNextCommits(1)
+  const third = await store.getRatings({ window: '7d', bypass: true })
+  assert.ok(third.ok && third.fresh)
+  assert.equal(snapshots.commitsLog.length, 1) // the failed write left nothing
+  // ...and the next success retries the snapshot with the new content (the
+  // hash was never recorded by the failed attempt).
+  const fourth = await store.getRatings({ window: '7d', bypass: true })
+  assert.ok(fourth.ok)
+  assert.equal(snapshots.commitsLog.length, 2)
+  assert.equal(snapshots.ratingsStore.get('7d').tiers.length, 4)
 })
 
 for (const [label, fn] of tests) {

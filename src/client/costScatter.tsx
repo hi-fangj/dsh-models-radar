@@ -26,52 +26,10 @@ import {
   type CostLadder,
   type ScatterPoint,
 } from './costMetrics.ts'
-import { costModelLabel, harnessMeta } from './harness.ts'
+import { costModelLabel, harnessMeta, modelColor } from './harness.ts'
 import { fmt } from './locales.ts'
 import { AXIS_STYLE, HGrid, PLOT_H, PLOT_W, PlotTip, viewBoxX } from './plotFrame.tsx'
 import { logDomain } from './plotGeometry.ts'
-
-/**
- * Site-canonical per-base palettes, resolved in the site's order: the
- * efficiency chart's EFFICIENCY_MODEL_COLORS overrides first, then its general
- * MODEL_COLORS, then the muted fallback (the site's FALLBACK_COLORS slot).
- */
-const BASE_MODEL_COLORS: Record<string, string> = {
-  'grok-4.6': '#f59e0b',
-  k3: '#10b981',
-  'gemini-3.7-flash': '#8b5cf6',
-  'glm-5.3': '#f5f5f5',
-  'glm-5.3-flash': '#f6c453',
-  'gpt-5.6-sol': '#eab308',
-  'gpt-5.6-terra': '#3b82f6',
-  'gpt-5.6-luna': '#c7d2e0',
-  'gpt-5.5': '#00e5ff',
-  'deepseek-v4-flash': '#4d6bfe',
-  'deepseek-v4-pro': '#a78bfa',
-  'dsh-deepseek-v4-flash': '#4d6bfe',
-  'dsh-deepseek-v4-pro': '#a78bfa',
-  'dsh-deepseek-v4-flash-vision-exp': '#22c55e',
-}
-
-const EFFICIENCY_MODEL_COLORS: Record<string, string> = {
-  'gpt-5.5': '#22d3ee',
-  'glm-5.3': '#06b6d4',
-  'glm-5.3-flash': '#f6c453',
-  'grok-4.6': '#f59e0b',
-  'gemini-3.7-flash': '#a78bfa',
-  'gpt-5.6-sol': '#fbbf24',
-  'gpt-5.6-terra': '#3b82f6',
-  'gpt-5.6-luna': '#d5dbe5',
-  'deepseek-v4-flash': '#c026d3',
-  'deepseek-v4-pro': '#f472b6',
-  'dsh-deepseek-v4-flash': '#c026d3',
-  'dsh-deepseek-v4-pro': '#f472b6',
-  'dsh-deepseek-v4-flash-vision-exp': '#16a34a',
-}
-
-function modelColor(base: string): string {
-  return EFFICIENCY_MODEL_COLORS[base] ?? BASE_MODEL_COLORS[base] ?? 'var(--dsw-alias-label-secondary)'
-}
 
 /** Site's efficiencyShapePath: marker shape per reasoning effort. */
 function effortShapePath(effort: string, cx: number, cy: number, r: number): string {

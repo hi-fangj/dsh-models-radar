@@ -20,7 +20,17 @@
  * - Clock: injectable so freshness windows are deterministically testable
  *   without real time.
  */
-import type { RadarChannel, RadarResponse, RadarTier, RadarView } from './contract.ts'
+import type {
+  CommunityRatingTier,
+  CommunityRatings,
+  CommunityRatingsPayload,
+  CommunityRatingsResponse,
+  RadarChannel,
+  RadarResponse,
+  RadarTier,
+  RadarView,
+  RatingsWindow,
+} from './contract.ts'
 
 /** Host log tag (kept local to avoid an import cycle with src/index.ts). */
 const LOG = 'dsh-models-radar'
@@ -35,6 +45,7 @@ const FRESH_BENCHMARKS_MS = 60 * 60_000 // channel list: near-static
 const FRESH_EFFICIENCY_MS = 15 * 60_000 // overview + capability readout
 const FRESH_LEADERBOARD_MS = 15 * 60_000 // per-task composition
 const FRESH_HISTORY_MS = 60 * 60_000 // trend: upstream adds one point/hour
+const FRESH_RATINGS_MS = 15 * 60_000 // community ratings: site republishes every 5 min
 /** Wholesale cold-start window: a persisted snapshot this fresh is served without touching upstream. */
 const FRESH_SNAPSHOT_MS = FRESH_EFFICIENCY_MS
 
@@ -133,17 +144,21 @@ export interface RadarRequest {
 /** True-external upstream port: fetch one raw dataset; adapters own URLs and HTTP. */
 export interface RadarUpstream {
   fetchDataset(kind: DatasetKind, benchmark: string): Promise<unknown>
+  /** The main-site community ratings (a second upstream host — see CONTEXT.md 社区体感分). */
+  fetchRatings(window: RatingsWindow): Promise<unknown>
 }
 
 /**
- * Local-substitutable snapshot port. `read` resolves undefined when absent or
- * unreadable (it never rejects for expected I/O outcomes). `commit` overwrites
- * the channel snapshot and, when the caller passes a timeline line (content
- * changed), appends it to the long-history accumulator.
+ * Local-substitutable snapshot port. `read`/`commit` own the per-channel
+ * benchmark snapshots; `readRatings`/`commitRatings` own the global (non-
+ * channel) community-ratings snapshots. Reads resolve undefined when absent
+ * or unreadable (never reject for expected I/O outcomes); commits overwrite.
  */
 export interface SnapshotStore {
   read(benchmark: string): Promise<RadarView | undefined>
   commit(benchmark: string, view: RadarView, timelineLine?: string): Promise<void>
+  readRatings(window: RatingsWindow): Promise<CommunityRatings | undefined>
+  commitRatings(window: RatingsWindow, ratings: CommunityRatings): Promise<void>
 }
 
 export interface Clock {
@@ -160,10 +175,69 @@ export interface RadarDataStore {
    * completes; a failed commit is diagnostic and never fails the response.
    */
   get(request: RadarRequest): Promise<RadarResponse>
+  /**
+   * The community-ratings counterpart (/api/ratings route): same semantics —
+   * freshness window, single-flight, stale fallback — but channel-global
+   * (CONTEXT.md 社区体感分) and window-scoped (`7d` / `24h` are independent
+   * datasets, each with its own snapshot).
+   */
+  getRatings(request: { window: RatingsWindow; bypass: boolean }): Promise<CommunityRatingsResponse>
 }
 
 const num = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null
+
+/** Effort tokens a ratings tier id may end with (the site's reasoning-effort vocabulary). */
+const EFFORT_TOKENS = new Set(['ultra', 'max', 'xhigh', 'high', 'medium', 'low', 'off'])
+
+/**
+ * Split a site ratings tier id (`gpt-5.6-sol-ultra`) into its
+ * `${model}@${effort}` parts. Only a trailing known effort token splits;
+ * anything else fails loose-schema tolerance and the entry is skipped by the
+ * caller — a benign site-side id shape change cannot corrupt tier keys.
+ */
+export function parseRatingTierId(id: string): { model: string; effort: string } | null {
+  const at = id.lastIndexOf('-')
+  if (at > 0) {
+    const effort = id.slice(at + 1)
+    if (EFFORT_TOKENS.has(effort)) return { model: id.slice(0, at), effort }
+  }
+  return null
+}
+
+/** Loose upstream face of one ratings entry. */
+interface UpRating {
+  id?: unknown
+  average?: unknown
+  count?: unknown
+}
+
+/** Normalize one raw ratings payload into the wire view model. */
+function normalizeRatings(window: RatingsWindow, raw: unknown, fetchedAt: string): CommunityRatings {
+  const entries = (raw as { models?: unknown } | null)?.models
+  const tiers: CommunityRatingTier[] = []
+  if (Array.isArray(entries)) {
+    for (const entry of entries as UpRating[]) {
+      if (typeof entry?.id !== 'string') continue
+      const parts = parseRatingTierId(entry.id)
+      if (parts === null) continue
+      tiers.push({
+        key: `${parts.model}@${parts.effort}`,
+        model: parts.model,
+        effort: parts.effort,
+        average: num(entry.average),
+        count: num(entry.count) ?? 0,
+      })
+    }
+  }
+  const updatedAt = (raw as { updated_at?: unknown } | null)?.updated_at
+  return {
+    window,
+    fetchedAt,
+    updatedAt: typeof updatedAt === 'string' ? updatedAt : undefined,
+    tiers,
+  }
+}
 
 /** djb2 over the stable stringified form — timeline-append dedupe only. */
 function djb2(text: string): string {
@@ -188,6 +262,8 @@ export function createRadarDataStore(
   const inflight = new Map<string, Promise<Flight>>()
   /** Last successfully assembled view per channel: wholesale fast path + failure fallback. */
   const lastView = new Map<string, RadarView>()
+  /** Last served ratings per window: wholesale fast path + failure fallback. */
+  const lastRatings = new Map<RatingsWindow, CommunityRatings>()
   /** Last committed timeline hash per benchmark (memory-only; restart may append one dup). */
   const lastHash = new Map<string, string>()
   /** Per-channel commit-queue tail: snapshot commits serialize in assembly order. */
@@ -197,14 +273,15 @@ export function createRadarDataStore(
    * Resolve one dataset within its freshness window. Fresh entries are served
    * from cache without touching upstream; stale/missing ones are fetched
    * (single-flight: concurrent requests share one upstream call, and a bypass
-   * still joins an in-flight call instead of duplicating it).
+   * still joins an in-flight call instead of duplicating it). The fetcher
+   * closes over whichever upstream face the caller drives (channel datasets
+   * and the global ratings share the one flight mechanism).
    */
   const resolveDataset = async (
     key: string,
-    kind: DatasetKind,
-    benchmark: string,
     windowMs: number,
     bypass: boolean,
+    fetcher: () => Promise<unknown>,
   ): Promise<Flight> => {
     const now = clock.now()
     const cached = datasets.get(key)
@@ -213,8 +290,7 @@ export function createRadarDataStore(
     }
     const pending = inflight.get(key)
     if (pending !== undefined) return pending
-    const flight: Promise<Flight> = upstream
-      .fetchDataset(kind, benchmark)
+    const flight: Promise<Flight> = fetcher()
       .then((value) => {
         const at = clock.now()
         datasets.set(key, { at, value })
@@ -243,7 +319,12 @@ export function createRadarDataStore(
   ): Promise<{ view: RadarView; upstreamHits: number }> => {
     const flights = await Promise.all(
       channelDatasets(benchmark).map((dataset) =>
-        resolveDataset(dataset.key, dataset.kind, benchmark, dataset.windowMs, bypass),
+        resolveDataset(
+          dataset.key,
+          dataset.windowMs,
+          bypass,
+          () => upstream.fetchDataset(dataset.kind, benchmark),
+        ),
       ),
     )
     const bench = flights[0].value as UpBenchmarks
@@ -324,10 +405,36 @@ export function createRadarDataStore(
   }
 
   /**
-   * One durable commit: overwrite the channel snapshot always, and append one
-   * hash-deduped iq-timeline line on content change. The hash is recorded
-   * only after a successful commit, so a failed write is retried by the next
-   * successful assembly.
+   * Queue one snapshot task on a serialized tail and wait for it. Committing
+   * in assembly order (and resolving the live-refresh response only
+   * afterwards) is what keeps disk from regressing behind the views already
+   * served — the previous fire-and-forget persist could interleave writes out
+   * of order. A failed commit is diagnostic only: the in-memory data stays
+   * authoritative and the next success retries the snapshot.
+   */
+  const enqueue = async (key: string, task: () => Promise<void>): Promise<void> => {
+    const tail = commits.get(key) ?? Promise.resolve()
+    const commit = tail.then(task)
+    // The queue tail survives individual commit outcomes.
+    commits.set(
+      key,
+      commit.then(
+        () => undefined,
+        () => undefined,
+      ),
+    )
+    try {
+      await commit
+    } catch (error) {
+      console.error(`[${LOG}] snapshot commit failed:`, error)
+    }
+  }
+
+  /**
+   * One durable channel commit: overwrite the channel snapshot always, and
+   * append one hash-deduped iq-timeline line on content change. The hash is
+   * recorded only after a successful commit, so a failed write is retried by
+   * the next successful assembly.
    */
   const commitSnapshot = async (benchmark: string, view: RadarView): Promise<void> => {
     const iq: Record<string, number> = {}
@@ -341,31 +448,8 @@ export function createRadarDataStore(
     lastHash.set(benchmark, hash)
   }
 
-  /**
-   * Queue a snapshot commit on the channel's serialized tail and wait for it.
-   * Committing in assembly order (and resolving the live-refresh response
-   * only afterwards) is what keeps disk from regressing behind the views
-   * already served — the previous fire-and-forget persist could interleave
-   * writes out of order. A failed commit is diagnostic only: the in-memory
-   * view stays authoritative and the next success retries the snapshot.
-   */
-  const enqueueCommit = async (benchmark: string, view: RadarView): Promise<void> => {
-    const tail = commits.get(benchmark) ?? Promise.resolve()
-    const commit = tail.then(() => commitSnapshot(benchmark, view))
-    // The queue tail survives individual commit outcomes.
-    commits.set(
-      benchmark,
-      commit.then(
-        () => undefined,
-        () => undefined,
-      ),
-    )
-    try {
-      await commit
-    } catch (error) {
-      console.error(`[${LOG}] snapshot commit failed:`, error)
-    }
-  }
+  const enqueueCommit = async (benchmark: string, view: RadarView): Promise<void> =>
+    enqueue(benchmark, () => commitSnapshot(benchmark, view))
 
   const readSnapshotSafe = async (benchmark: string): Promise<RadarView | undefined> => {
     try {
@@ -430,5 +514,92 @@ export function createRadarDataStore(
     }
   }
 
-  return { get }
+  const readRatingsSafe = async (win: RatingsWindow): Promise<CommunityRatings | undefined> => {
+    try {
+      return await snapshots.readRatings(win)
+    } catch {
+      return undefined
+    }
+  }
+
+  /** Memory/snapshot ratings serve with the payload wrapper's fresh flags. */
+  const serveRatings = (ratings: CommunityRatings, throttled: boolean): CommunityRatingsPayload => ({
+    ok: true,
+    fresh: true,
+    throttled: throttled || undefined,
+    fetchedAt: ratings.fetchedAt,
+    data: ratings,
+  })
+
+  const getRatings = async ({
+    window: win,
+    bypass,
+  }: {
+    window: RatingsWindow
+    bypass: boolean
+  }): Promise<CommunityRatingsResponse> => {
+    const key = `ratings:${win}`
+    const now = clock.now()
+    if (!bypass) {
+      // Wholesale fast path: the window's dataset is still inside its window.
+      const cached = datasets.get(key)
+      if (cached !== undefined && now - cached.at < FRESH_RATINGS_MS) {
+        return serveRatings(cached.value as CommunityRatings, true)
+      }
+      // Cold start / snapshot-served re-windowing, mirroring the channel get().
+      const current = lastRatings.get(win)
+      if (current === undefined) {
+        const saved = await readRatingsSafe(win)
+        const savedAt = saved === undefined ? NaN : Date.parse(saved.fetchedAt)
+        if (saved !== undefined && Number.isFinite(savedAt) && now - savedAt < FRESH_SNAPSHOT_MS) {
+          lastRatings.set(win, saved)
+          return serveRatings(saved, true)
+        }
+      } else {
+        const currentAt = Date.parse(current.fetchedAt)
+        if (Number.isFinite(currentAt) && now - currentAt < FRESH_SNAPSHOT_MS) {
+          return serveRatings(current, true)
+        }
+      }
+    }
+
+    try {
+      // Normalize inside the fetcher so the dataset cache holds the wire view
+      // model, exactly as the channel assembly's outputs do downstream.
+      const flight = await resolveDataset(key, FRESH_RATINGS_MS, bypass, async () => {
+        const raw = await upstream.fetchRatings(win)
+        return normalizeRatings(win, raw, new Date(clock.now()).toISOString())
+      })
+      const ratings = flight.value as CommunityRatings
+      lastRatings.set(win, ratings)
+      // One hash-deduped snapshot write on the window's serialized tail; the
+      // hash is recorded only after a successful commit, so a failed write is
+      // retried by the next success (mirroring the channel-side discipline).
+      // A failed commit is diagnostic and never fails the response.
+      await enqueue(key, () => {
+        const hash = djb2(JSON.stringify(ratings.tiers))
+        if (lastHash.get(key) === hash) return Promise.resolve()
+        return snapshots.commitRatings(win, ratings).then(() => {
+          lastHash.set(key, hash)
+        })
+      })
+      return {
+        ok: true,
+        fresh: true,
+        throttled: flight.upstream ? undefined : true,
+        fetchedAt: ratings.fetchedAt,
+        data: ratings,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`[${LOG}] ratings refresh failed (${win}):`, message)
+      const last = lastRatings.get(win) ?? (await readRatingsSafe(win))
+      if (last !== undefined) {
+        return { ok: true, fresh: false, stale: true, notice: message, fetchedAt: last.fetchedAt, data: last }
+      }
+      return { ok: false, error: message }
+    }
+  }
+
+  return { get, getRatings }
 }

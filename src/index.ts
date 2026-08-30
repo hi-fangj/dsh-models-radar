@@ -24,7 +24,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type { RadarView } from './contract.ts'
+import type { CommunityRatings, RadarView, RatingsWindow } from './contract.ts'
 import { createRadarDataStore, type DatasetKind, type RadarUpstream, type SnapshotStore } from './store.ts'
 
 /** Cordis plugin name (the Loader entry and client bundle id). */
@@ -34,6 +34,14 @@ export const name = 'dsh-models-radar'
 export const inject = ['webServer', 'settings']
 
 const UPSTREAM = 'https://api.codexradar.com/api/v1'
+
+/**
+ * The community-ratings upstream is the codexradar main site, not the benchmark
+ * API host above — /api/model-ratings only exists there (CONTEXT.md 社区体感分).
+ * Same CORS regime (origin allowlist, no ACAO for our page), so it rides the
+ * same host-side fetch discipline as ADR 0001.
+ */
+const UPSTREAM_RATINGS = 'https://codexradar.com'
 const ROUTE_PREFIX = '/model-radar'
 const FETCH_TIMEOUT_MS = 30_000
 
@@ -86,6 +94,15 @@ const codexRadarUpstream = (): RadarUpstream => ({
     if (!response.ok) throw new Error(`upstream ${pathAndQuery} → HTTP ${response.status}`)
     return (await response.json()) as unknown
   },
+  async fetchRatings(window) {
+    const pathAndQuery = `/api/model-ratings?view=public&window=${encodeURIComponent(window)}`
+    const response = await fetch(UPSTREAM_RATINGS + pathAndQuery, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
+    if (!response.ok) throw new Error(`upstream ${pathAndQuery} → HTTP ${response.status}`)
+    return (await response.json()) as unknown
+  },
 })
 
 function dataDir(): string {
@@ -94,6 +111,7 @@ function dataDir(): string {
 }
 
 const latestPath = (benchmark: string): string => join(dataDir(), `latest-${benchmark}.json`)
+const ratingsPath = (window: string): string => join(dataDir(), `latest-ratings-${window}.json`)
 
 /**
  * Production snapshot adapter: filesystem mechanics only. Ordering, dedupe
@@ -114,6 +132,17 @@ const fileSnapshotStore = (): SnapshotStore => ({
     if (timelineLine !== undefined) {
       await appendFile(join(dataDir(), 'iq-timeline.jsonl'), `${timelineLine}\n`, 'utf8')
     }
+  },
+  async readRatings(window) {
+    try {
+      return JSON.parse(await readFile(ratingsPath(window), 'utf8')) as CommunityRatings
+    } catch {
+      return undefined
+    }
+  },
+  async commitRatings(window, ratings) {
+    await mkdir(dataDir(), { recursive: true })
+    await writeFile(ratingsPath(window), JSON.stringify(ratings), 'utf8')
   },
 })
 
@@ -156,6 +185,18 @@ export function apply(ctx: Context): void {
     }
     const bypass = url.searchParams.get('bypass') === '1'
     const response = await store.get({ benchmark, bypass, defaultModel: currentDefaultModel() })
+    respond(res, response.ok ? 200 : 502, response)
+  }
+
+  /** HTTP adapter for the ratings route: window validation, delegate, map status. */
+  async function handleRatings(url: URL, res: import('node:http').ServerResponse): Promise<void> {
+    const window = url.searchParams.get('window') ?? '7d'
+    if (window !== '7d' && window !== '24h') {
+      respond(res, 400, { ok: false, error: 'bad ratings window' })
+      return
+    }
+    const bypass = url.searchParams.get('bypass') === '1'
+    const response = await store.getRatings({ window: window as RatingsWindow, bypass })
     respond(res, response.ok ? 200 : 502, response)
   }
 
@@ -228,6 +269,8 @@ export function apply(ctx: Context): void {
                 respond(res, 405, { ok: false, error: 'method not allowed' })
               } else if (url.pathname === `${ROUTE_PREFIX}/api/data`) {
                 await handleData(url, res)
+              } else if (url.pathname === `${ROUTE_PREFIX}/api/ratings`) {
+                await handleRatings(url, res)
               } else if (url.pathname === `${ROUTE_PREFIX}/api/health`) {
                 respond(res, 200, { ok: true })
               } else {
