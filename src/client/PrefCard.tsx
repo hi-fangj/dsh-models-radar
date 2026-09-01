@@ -1,15 +1,18 @@
 /**
  * The plugin's card in 设置 → 插件 → 可配置插件 (the `settings.plugin.item`
  * slot, keyed by the Host-side `dsh-models-radar` settings namespace). A
- * collapsible disclosure like the ecosystem plugin cards: a full-width
- * header button (name + description + chevron) over a conditionally rendered
- * body holding the display-preference switch and its explanation lines.
- * Writes go through the same liveVisible store the dock capsule reads, so a
- * toggle here hides the capsule instantly. Disclosure state stays local —
- * the plugins tab keeps visited tabs mounted, so it survives tab switches.
+ * collapsible disclosure mirroring the core PluginCard chrome — same 12px
+ * card surface, 14/16 header padding, and the shared chevron icon — so this
+ * card is indistinguishable from the built-in ones while folded, over a
+ * conditionally rendered body holding the display-preference switch and its
+ * explanation lines. Writes go through the same liveVisible store the dock
+ * capsule reads, so a toggle here hides the capsule instantly. Disclosure
+ * state stays local — the plugins tab keeps visited tabs mounted, so it
+ * survives tab switches.
  */
 import { useState, useSyncExternalStore } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { liveVisibleStore, setLiveVisible } from './liveVisible.ts'
 
 /** Card props: the locale seat (the store is module-level, no inject face). */
@@ -35,7 +38,9 @@ export function PrefCard({ t }: PrefCardProps) {
           <span className="dsh_mr_prefName">{t('pref.card.title')}</span>
           <span className="dsh_mr_prefDescription">{t('pref.card.description')}</span>
         </span>
-        <span className="dsh_mr_prefChevron" data-open={open} aria-hidden="true">▾</span>
+        <IconChevronDownOutline14
+          className={open ? 'dsh_mr_prefChevron dsh_mr_prefChevronOpen' : 'dsh_mr_prefChevron'}
+        />
       </button>
       {open && (
         <div className="dsh_mr_prefBody">

@@ -815,21 +815,22 @@ a.dsh_mr_barLabel:hover { color: var(--dsw-alias-brand-primary); text-decoration
 .dsh_mr_dot[data-fresh="true"] { background: var(--dsw-alias-state-success-primary); }
 .dsh_mr_dot[data-fresh="false"] { background: var(--dsw-alias-state-warn-primary); }
 .dsh_mr_footerSpacer { flex: 1 1 auto; }
-/* Plugin-configuration card (设置 → 插件 → 可配置插件), the collapsible
-   disclosure used by ecosystem plugin cards: a full-width header button
-   (name + description + chevron) over a conditionally rendered body. The
-   card owns the list-item surface the plugins tab stacks; open state flips
-   data-open on the card and chevron. */
+/* Plugin-configuration card (设置 → 插件 → 可配置插件), a collapsible
+   disclosure mirroring the core PluginCard chrome: a full-width header
+   button (name + description + chevron icon) over a conditionally rendered
+   body, with spacing from the plugins tab's list gap — so this card is
+   indistinguishable from the built-in ones while folded. Open state flips
+   data-open on the card and a class on the chevron. */
 .dsh_mr_prefCard {
   border: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-layer-3);
-  border-radius: 8px;
+  border-radius: 12px;
   min-width: 0;
   list-style: none;
   transition: border-color 160ms ease, background-color 160ms ease;
   overflow: hidden;
-  margin-bottom: 8px;
 }
+.dsh_mr_prefCard:hover { border-color: var(--dsh-alias-label-dimmed); }
 .dsh_mr_prefCard[data-open="true"] {
   background: var(--dsw-alias-bg-layer-2);
   border-color: var(--dsw-alias-label-dimmed);
@@ -843,44 +844,46 @@ a.dsh_mr_barLabel:hover { color: var(--dsw-alias-brand-primary); text-decoration
   background: none;
   border: 0;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
   display: flex;
 }
-.dsh_mr_prefHeader:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.dsh_mr_prefHeader:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: -2px;
+}
 .dsh_mr_prefHeadText {
   flex-direction: column;
   flex: 1;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
   display: flex;
-  overflow: hidden;
 }
 .dsh_mr_prefName {
   color: var(--dsw-alias-label-primary);
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  font-size: 15px;
   font-weight: 600;
-  overflow: hidden;
+  line-height: 1.4;
 }
 .dsh_mr_prefDescription {
   color: var(--dsw-alias-label-tertiary);
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
 }
 .dsh_mr_prefChevron {
   color: var(--dsw-alias-label-tertiary);
   flex: none;
-  font-size: 13px;
-  transition: transform 120ms ease;
+  display: block;
+  transition: transform 160ms ease;
 }
-.dsh_mr_prefChevron[data-open="true"] { transform: rotate(180deg); }
+.dsh_mr_prefChevronOpen { transform: rotate(180deg); }
 .dsh_mr_prefBody {
+  border-top: 1px solid var(--dsw-alias-border-l2);
+  margin: 0 16px;
+  padding: 12px 0 8px;
   flex-direction: column;
   gap: 12px;
-  padding: 0 14px 14px;
   display: flex;
 }
 .dsh_mr_prefText {
