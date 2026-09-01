@@ -57,7 +57,7 @@ _Avoid_: family、裸模型名
 _Avoid_: 排行榜、leaderboard（界面用语中）、能力列表（可能与任务能力构成混淆）
 
 **Harness**:
-贡献者提交判分所用的 agent 运行器，现役七种：Codex、DSH、ZCode、Grok、Kimi Code、Antigravity、CodeBuddy。由被测配置的模型标识推导得出（如 `dsh-` 前缀、`glm-5.3*`、`k3`、`grok-4.6`、`gemini-3.7-flash`、`hy4-preview`），是档位的展示层派生属性：只标注出处，不参与排行、分组或聚合——分数永远以档位为单位。推导不出的档位不打标。
+贡献者提交判分所用的 agent 运行器，现役八种：Codex、Claude Code、DSH、ZCode、Grok、Kimi Code、Antigravity、CodeBuddy。由被测配置的模型标识推导得出（如 `dsh-` 前缀、`glm-5.3*`、`k3`、`grok-4.6`、`gemini-3.7-flash`、`hy4-preview`、`claude-sonnet-5`/`claude-opus-5`），是档位的展示层派生属性：只标注出处，不参与排行、分组或聚合——分数永远以档位为单位。推导不出的档位不打标。
 _Avoid_: 评测端、运行器、客户端、benchmark
 
 **能力等级（Capability Band）**:

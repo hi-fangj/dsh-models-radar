@@ -17,21 +17,25 @@ assert.equal(harnessOfModel('grok-4.6'), 'grok')
 assert.equal(harnessOfModel('gemini-3.7-flash'), 'antigravity')
 assert.equal(harnessOfModel('hy4-preview'), 'codebuddy')
 assert.equal(harnessOfModel('HY4-Preview'), 'codebuddy') // case-normalized
+assert.equal(harnessOfModel('claude-sonnet-5'), 'claude-code')
+assert.equal(harnessOfModel('Claude-Opus-5'), 'claude-code') // case-normalized
 assert.equal(harnessOfModel('gpt-5.6-sol'), 'codex')
 assert.equal(harnessOfModel('deepseek-v4-pro'), 'codex')
 assert.equal(harnessOfModel('mystery-model'), null)
 
 // Badge metadata: every id carries the site-canonical label, colors stay
 // distinct so the overview dots never collide.
-const ids = ['codex', 'dsh', 'zcode', 'grok', 'kimi-code', 'antigravity', 'codebuddy']
+const ids = ['codex', 'claude-code', 'dsh', 'zcode', 'grok', 'kimi-code', 'antigravity', 'codebuddy']
 const colors = new Set(ids.map((id) => harnessMeta(id).color))
 assert.equal(colors.size, ids.length)
 assert.equal(harnessMeta('antigravity').label, 'Antigravity')
 assert.equal(harnessMeta('codebuddy').label, 'CodeBuddy')
+assert.equal(harnessMeta('claude-code').label, 'Claude Code')
 
 // Selector options append the harness segment only when one matched.
 assert.equal(tierOptionLabel({ model: 'gemini-3.7-flash', effort: 'low' }), 'gemini-3.7-flash · low · Antigravity')
 assert.equal(tierOptionLabel({ model: 'hy4-preview', effort: 'max' }), 'hy4-preview · max · CodeBuddy')
+assert.equal(tierOptionLabel({ model: 'claude-sonnet-5', effort: 'high' }), 'claude-sonnet-5 · high · Claude Code')
 assert.equal(tierOptionLabel({ model: 'mystery', effort: 'high' }), 'mystery · high')
 
 // Pretty names: site table first, then GPT codename capitalization, then the
@@ -40,6 +44,8 @@ assert.equal(prettyModelName('dsh-deepseek-v4-flash-vision-exp'), 'DeepSeek V4 F
 assert.equal(prettyModelName('gpt-5.6-sol'), 'GPT-5.6 Sol')
 assert.equal(prettyModelName('gpt-5.5'), 'GPT-5.5')
 assert.equal(prettyModelName('hy4-preview'), 'HY4 Preview')
+assert.equal(prettyModelName('claude-sonnet-5'), 'Claude Sonnet 5')
+assert.equal(prettyModelName('claude-opus-5'), 'Claude Opus 5')
 assert.equal(prettyModelName('mystery-model'), 'mystery-model')
 
 // Cost attribution labels mirror the site's efficiencyModelLabel: the
@@ -57,9 +63,15 @@ assert.deepEqual(costModelLabel('k3'), { name: 'K3', billing: 'subscription', ha
 assert.deepEqual(costModelLabel('gpt-5.6-sol'), { name: 'Sol', billing: 'subscription', harness: null })
 assert.deepEqual(costModelLabel('gpt-5.5'), { name: 'GPT-5.5', billing: 'subscription', harness: null })
 assert.deepEqual(costModelLabel('hy4-preview'), { name: 'HY4 Preview', billing: 'subscription', harness: null })
+// Claude Code runs on the anthropic subscription: pretty name only — the site
+// attaches a harness segment to the API-metered DeepSeek V4 family alone.
+assert.deepEqual(costModelLabel('claude-sonnet-5'), { name: 'Claude Sonnet 5', billing: 'subscription', harness: null })
 
 // Per-base display colors follow the site's tables; hy4-preview wears its
-// signature pink in both the general and efficiency palettes.
+// signature pink in both the general and efficiency palettes, and the Claude
+// Code pair keeps its site palettes (sonnet clay, opus violet).
 assert.equal(modelColor('hy4-preview'), '#ec4899')
+assert.equal(modelColor('claude-sonnet-5'), '#d97757')
+assert.equal(modelColor('claude-opus-5'), '#a855f7')
 
 console.log('harness tests passed')

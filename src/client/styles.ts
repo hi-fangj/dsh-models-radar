@@ -338,6 +338,7 @@ span.dsh_mr_ovChevron { cursor: default; }
 /* Site harnessbar palette; codex — the site's default harness — wears its
    default accent, since #8b5cf6 is antigravity's slot there. */
 .dsh_mr_ovHarness[data-harness='codex'] { --dsh-mr-harness-color: #2dd4bf; }
+.dsh_mr_ovHarness[data-harness='claude-code'] { --dsh-mr-harness-color: #d97757; }
 .dsh_mr_ovHarness[data-harness='dsh'] { --dsh-mr-harness-color: #4d6bfe; }
 .dsh_mr_ovHarness[data-harness='zcode'] { --dsh-mr-harness-color: #06b6d4; }
 .dsh_mr_ovHarness[data-harness='grok'] { --dsh-mr-harness-color: #f59e0b; }

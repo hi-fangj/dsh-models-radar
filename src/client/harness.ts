@@ -4,7 +4,8 @@
  * mirroring the radar site's own classification intent (its advertised client
  * configs are "zcode-glm-5.3-family…", "kimi-code-k3…", "grok-build-4.6…", the
  * google-antigravity-subscription Gemini (gemini-3.7-flash), the
- * codebuddy-subscription HY4 Preview (hy4-preview) plus the dsh-prefixed
+ * anthropic-subscription Claude Code pair (claude-sonnet-5, claude-opus-5),
+ * the codebuddy-subscription HY4 Preview (hy4-preview) plus the dsh-prefixed
  * artifacts). Labels are the site-canonical proper nouns, shared
  * by both locales. An unmatched model gets NO badge — never a guess.
  *
@@ -16,7 +17,7 @@
  * persisted snapshots, so old snapshots render unchanged.
  */
 
-export type HarnessId = 'codex' | 'dsh' | 'zcode' | 'grok' | 'kimi-code' | 'antigravity' | 'codebuddy'
+export type HarnessId = 'codex' | 'claude-code' | 'dsh' | 'zcode' | 'grok' | 'kimi-code' | 'antigravity' | 'codebuddy'
 
 export interface HarnessMeta {
   label: string
@@ -26,6 +27,7 @@ export interface HarnessMeta {
 
 const HARNESS_META: Record<HarnessId, HarnessMeta> = {
   codex: { label: 'Codex', color: '#2dd4bf' },
+  'claude-code': { label: 'Claude Code', color: '#d97757' },
   dsh: { label: 'DSH', color: '#4d6bfe' },
   zcode: { label: 'ZCode', color: '#06b6d4' },
   grok: { label: 'Grok', color: '#f59e0b' },
@@ -52,6 +54,7 @@ export function harnessOfModel(model: string): HarnessId | null {
   if (id === 'grok-4.6') return 'grok'
   if (id === 'gemini-3.7-flash') return 'antigravity'
   if (id === 'hy4-preview') return 'codebuddy'
+  if (id === 'claude-sonnet-5' || id === 'claude-opus-5') return 'claude-code'
   if (id.startsWith('gpt-') || id.startsWith('deepseek-v')) return 'codex'
   return null
 }
@@ -69,6 +72,8 @@ const PRETTY_MODEL: Record<string, string> = {
   'grok-4.6': 'Grok 4.6',
   'gemini-3.7-flash': 'Gemini 3.7 Flash',
   'hy4-preview': 'HY4 Preview',
+  'claude-sonnet-5': 'Claude Sonnet 5',
+  'claude-opus-5': 'Claude Opus 5',
 }
 
 /**
@@ -135,6 +140,8 @@ export function tierOptionLabel(tier: { model: string; effort: string }): string
  * encode 颜色＝基座 with the same table (CONTEXT.md 成本对比 / 社区体感分).
  */
 const BASE_MODEL_COLORS: Record<string, string> = {
+  'claude-sonnet-5': '#d97757',
+  'claude-opus-5': '#a855f7',
   'grok-4.6': '#f59e0b',
   k3: '#10b981',
   'hy4-preview': '#ec4899',
@@ -153,6 +160,8 @@ const BASE_MODEL_COLORS: Record<string, string> = {
 }
 
 const EFFICIENCY_MODEL_COLORS: Record<string, string> = {
+  'claude-sonnet-5': '#d97757',
+  'claude-opus-5': '#a855f7',
   'gpt-5.5': '#22d3ee',
   'glm-5.3': '#06b6d4',
   'glm-5.3-flash': '#f6c453',
