@@ -93,6 +93,16 @@ assert.deepEqual(windowed, { change: -5, direction: 'down', min: 85, average: 87
 assert.equal(windowSummary([['2026-08-28T00:00:00Z', 10], ['2026-08-28T01:00:00Z', 10.2]]).direction, 'flat')
 assert.equal(windowSummary([]), null)
 
+// Single-point window (CONTEXT.md 趋势): the flat test-time-to-now line keeps
+// its stats row — net change ±0 and the range collapsed onto the reading.
+assert.deepEqual(windowSummary([['2026-08-28T05:00:00Z', 91.4]]), {
+  change: 0,
+  direction: 'flat',
+  min: 91.4,
+  average: 91.4,
+  max: 91.4,
+})
+
 // sliceRecentPoints: time-based cutoff (not last-N), invalid stamps dropped,
 // ascending order preserved.
 const now = Date.now()

@@ -85,7 +85,7 @@ export function TrendCard({
         </select>
       </div>
       {hint !== undefined && hint !== null && <div className="dsh_mr_hint">{hint}</div>}
-      {points.length >= 2 ? (
+      {points.length >= 1 ? (
         <TrendTabs points={points} t={t} />
       ) : (
         <div className="dsh_mr_empty">{t('empty.noSeries')}</div>

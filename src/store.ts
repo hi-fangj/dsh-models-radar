@@ -97,6 +97,9 @@ interface UpEfficiency {
   scoring_mode?: string
   score_label?: string
   source_updated_at?: string
+  /** Live-cohort marker + benchmark ownership of the authoritative trend sample. */
+  mode?: string
+  benchmark_id?: string
 }
 
 interface UpHistoryEntry {
@@ -224,6 +227,55 @@ interface UpRating {
   id?: unknown
   average?: unknown
   count?: unknown
+}
+
+/**
+ * The authoritative live trend sample the official trend cards extend every
+ * tier series with (deng.codexradar.com `withAuthoritativeTrendPoint`): the
+ * efficiency feed's equal-latest-3 aggregate — Σpassed/Σtotal, equal weight
+ * × 150 = IQ, one decimal — stamped with the feed's `source_updated_at`.
+ * Null unless the feed really owns this benchmark's cohort and carries
+ * equal-weight totals: the site's own guards (`mode === 'equal_latest_3'`,
+ * benchmark match, non-null passed/total), which keep an older cached or
+ * partially filled payload out of an equal-latest-3 history line.
+ */
+function authoritativeTrendSample(
+  eff: UpEfficiency,
+  benchmark: string,
+  point: UpPoint,
+): { ts: string; score: number } | null {
+  if (eff.mode !== 'equal_latest_3' || eff.benchmark_id !== benchmark) return null
+  if (typeof eff.source_updated_at !== 'string' || Number.isNaN(Date.parse(eff.source_updated_at))) return null
+  const passed = num(point.passed)
+  const total = num(point.total)
+  if (passed === null || total === null || total <= 0) return null
+  return { ts: eff.source_updated_at, score: Math.round((passed / total) * 1500) / 10 }
+}
+
+/**
+ * Append (or fold) the live sample into a tier's hourly series with the
+ * site's ordering rules: never move the line backwards (a lagging feed must
+ * not outrun newer history), and a sample in the trailing point's UTC hour
+ * replaces it — one reading per hour. Both stamps are UTC-stamped strings
+ * (`+00:00`/`Z`), so the site's ISO-prefix hour comparison applies verbatim.
+ */
+function withLiveTrendPoint(
+  series: Array<[string, number]>,
+  sample: { ts: string; score: number } | null,
+): Array<[string, number]> {
+  if (sample === null) return series
+  const liveTime = Date.parse(sample.ts)
+  if (!Number.isFinite(liveTime)) return series
+  const out = series.slice()
+  const last = out[out.length - 1]
+  const lastTime = last === undefined ? NaN : Date.parse(last[0])
+  if (Number.isFinite(lastTime) && liveTime < lastTime) return out
+  if (last !== undefined && last[0].slice(0, 13) === sample.ts.slice(0, 13)) {
+    out[out.length - 1] = [sample.ts, sample.score]
+  } else {
+    out.push([sample.ts, sample.score])
+  }
+  return out
 }
 
 /** Normalize one raw ratings payload into the wire view model. */
@@ -396,14 +448,21 @@ export function createRadarDataStore(
         passRate: total > 0 ? passed / total : null,
         runs24h: num(point.runs_24h) ?? 0,
       })
-      // Prefer the exact tier series; fall back to the base-model series when
-      // the site has not split this tier out yet.
+      // The tier series mirrors the site's trend semantics: the hourly
+      // iq-history (exact tier, falling back to the base model) extended with
+      // the efficiency feed's authoritative live sample — so a tier whose
+      // hourly history has gone quiet (e.g. the dsh- DeepSeek variants) still
+      // carries its current reading, and a 24h slice renders the site's
+      // one-point trend instead of an empty window (CONTEXT.md 趋势).
       const entries = hist[key] ?? hist[point.model]
-      if (Array.isArray(entries) && entries.length > 0) {
-        series[key] = entries
-          .filter((e): e is typeof e & { ts: string } => typeof e.ts === 'string')
-          .map((e) => [e.ts, num(e.score) ?? 0])
-      }
+      const hourly =
+        Array.isArray(entries) && entries.length > 0
+          ? entries
+              .filter((e): e is typeof e & { ts: string } => typeof e.ts === 'string')
+              .map((e) => [e.ts, num(e.score) ?? 0])
+          : []
+      const merged = withLiveTrendPoint(hourly, authoritativeTrendSample(eff, benchmark, point))
+      if (merged.length > 0) series[key] = merged
     }
     tiers.sort((a, b) => b.iq - a.iq)
 

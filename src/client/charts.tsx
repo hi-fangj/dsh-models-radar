@@ -8,7 +8,7 @@ import { PersistentScrollFrame } from './ScrollFrame.tsx'
 import { bandColor, deltaSignal, iqBand, sliceRecentPoints, windowSummary } from './scoreMetrics.ts'
 import type { IqBand } from './scoreMetrics.ts'
 import { AXIS_STYLE, HGrid, PLOT_H, PLOT_W, PlotTip, viewBoxX } from './plotFrame.tsx'
-import { BAND_BOUNDARIES, buildSegments, fitRange } from './plotGeometry.ts'
+import { BAND_BOUNDARIES, buildSegments, fitRange, singlePointSpan } from './plotGeometry.ts'
 import { diagnoseTasks, taskLanguageBadge, taskMode, visibleOf } from './taskMetrics.ts'
 import type { TaskFilter, TaskRow } from './taskMetrics.ts'
 
@@ -27,7 +27,7 @@ type Translate = (key: ModelRadarKey) => string
 
 const two = (n: number): string => (n < 10 ? `0${n}` : String(n))
 
-function formatStamp(iso: string, withTime: boolean): string {
+function formatStamp(iso: string | number, withTime: boolean): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
   const base = `${two(date.getMonth() + 1)}-${two(date.getDate())}`
@@ -40,9 +40,11 @@ function clamp(value: number, min: number, max: number): number {
 
 /**
  * One time-window trend panel: captioned chart with its own symmetric stats
- * row (net change / low / average / high over this window). Fewer than two
- * points renders an empty-state text instead of a chart. The caption is
- * omitted when a tab control already carries the window context.
+ * row (net change / low / average / high over this window). A lone point
+ * renders the flat line from its test time to the current moment (CONTEXT.md
+ * 趋势) instead of a chart-with-curve; an empty window renders the
+ * empty-state text. The caption is omitted when a tab control already
+ * carries the window context.
  */
 export function TrendPanel({
   title,
@@ -55,26 +57,50 @@ export function TrendPanel({
   points: Array<[string, number]>
   t: Translate
 }) {
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null)
+  // Hover trace: the sampled point's index plus its viewBox x — multi-point
+  // panels ride the curve by index, the single-point panel pins index 0 and
+  // follows the pointer so the one reading is reachable everywhere.
+  const [hover, setHover] = useState<{ index: number; px: number } | null>(null)
   const summary = windowSummary(points)
 
   const geometry = useMemo(() => {
-    if (points.length < 2) return null
+    if (points.length === 0) return null
     const { lo, hi } = fitRange(points.map(([, value]) => value))
     const innerW = PLOT_W - PAD.left - PAD.right
     const innerH = PLOT_H - PAD.top - PAD.bottom
-    const x = (index: number): number => PAD.left + (index / (points.length - 1)) * innerW
     const y = (value: number): number => PAD.top + (1 - (value - lo) / (hi - lo)) * innerH
+    const baseline = PLOT_H - PAD.bottom
+    const bandLines = BAND_BOUNDARIES.map((boundary) => ({ boundary, py: y(boundary) }))
+      .filter(({ py }) => py >= PAD.top - 0.5 && py <= PLOT_H - PAD.bottom + 0.5)
+    if (points.length === 1) {
+      const testTs = new Date(points[0][0]).getTime()
+      const now = Date.now()
+      const span = singlePointSpan(Number.isNaN(testTs) ? now : testTs, now)
+      return {
+        kind: 'single' as const,
+        lo,
+        hi,
+        y,
+        baseline,
+        bandLines,
+        value: points[0][1],
+        pointX: PAD.left + span.pointFraction * innerW,
+        endX: PAD.left + innerW,
+        loTs: span.lo,
+        hiTs: span.hi,
+      }
+    }
+    const x = (index: number): number => PAD.left + (index / (points.length - 1)) * innerW
     return {
+      kind: 'multi' as const,
       lo,
       hi,
-      x,
       y,
+      baseline,
+      bandLines,
+      x,
       last: points.length - 1,
-      baseline: PLOT_H - PAD.bottom,
       segments: buildSegments(points.map(([, value]) => value), x, y),
-      bandLines: BAND_BOUNDARIES.map((boundary) => ({ boundary, py: y(boundary) }))
-        .filter(({ py }) => py >= PAD.top - 0.5 && py <= PLOT_H - PAD.bottom + 0.5),
     }
   }, [points])
 
@@ -88,13 +114,32 @@ export function TrendPanel({
     )
   }
 
-  const { lo, hi, x, y, last, baseline, segments, bandLines } = geometry
+  const { lo, hi, y, baseline, bandLines } = geometry
   const mid = (lo + hi) / 2
-  const hovered = hoverIndex !== null ? points[hoverIndex] : undefined
+  const single = geometry.kind === 'single' ? geometry : null
+  const multi = geometry.kind === 'multi' ? geometry : null
+  const hovered = hover !== null ? points[hover.index] : undefined
   const changeText = deltaSignal({ direction: summary.direction, delta: summary.change }).text
   // The endpoint and hover markers carry the capability band color: the
   // momentum semantics live in the delta badge and trend stats instead.
-  const endpointColor = bandColor(iqBand(points[last][1]))
+  const endpointValue = geometry.kind === 'single' ? geometry.value : points[geometry.last][1]
+  const endpointColor = bandColor(iqBand(endpointValue))
+  const endpointY = y(endpointValue)
+  // The lone reading's value label reads rightward while the point hugs the
+  // left edge; a clock-skewed clamp parks it on the right edge, where the
+  // label flips to read leftward to stay inside the plot.
+  const singleLabelAnchor = single !== null && single.pointX > PLOT_W - PAD.right - 60 ? ('end' as const) : ('start' as const)
+  const onMove = (event: MouseEvent<SVGSVGElement>): void => {
+    if (geometry === null) return
+    const relX = viewBoxX(event, PLOT_W)
+    if (geometry.kind === 'single') {
+      setHover({ index: 0, px: clamp(relX, PAD.left, PLOT_W - PAD.right) })
+      return
+    }
+    const ratio = (relX - PAD.left) / (PLOT_W - PAD.left - PAD.right)
+    const index = clamp(Math.round(ratio * (points.length - 1)), 0, points.length - 1)
+    setHover({ index, px: geometry.x(index) })
+  }
 
   return (
     <section className="dsh_mr_trendPanel">
@@ -113,12 +158,8 @@ export function TrendPanel({
           viewBox={`0 0 ${PLOT_W} ${PLOT_H}`}
           role="img"
           aria-label={`${title} · IQ trend`}
-          onMouseMove={(event: MouseEvent<SVGSVGElement>) => {
-            const relX = viewBoxX(event, PLOT_W)
-            const ratio = (relX - PAD.left) / (PLOT_W - PAD.left - PAD.right)
-            setHoverIndex(clamp(Math.round(ratio * (points.length - 1)), 0, points.length - 1))
-          }}
-          onMouseLeave={() => setHoverIndex(null)}
+          onMouseMove={onMove}
+          onMouseLeave={() => setHover(null)}
         >
           {[hi, mid, lo].map((value) => (
             <HGrid key={value} y={y(value)} x1={PAD.left} x2={PLOT_W - PAD.right} label={value.toFixed(1)} dash={value === mid ? 'none' : '3 4'} />
@@ -129,7 +170,7 @@ export function TrendPanel({
               <text x={PLOT_W - PAD.right + 6} y={py + 3.5} textAnchor="start" style={{ ...AXIS_STYLE, fontSize: 9 }}>{boundary}</text>
             </g>
           ))}
-          {segments.map((segment, index) => (
+          {multi !== null && multi.segments.map((segment, index) => (
             <g key={index}>
               <path
                 d={`${segment.path} L ${segment.x1.toFixed(1)} ${baseline} L ${segment.x0.toFixed(1)} ${baseline} Z`}
@@ -139,19 +180,58 @@ export function TrendPanel({
               <path d={segment.path} fill="none" stroke={segment.color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
             </g>
           ))}
-          {hovered !== undefined && hoverIndex !== null && (
+          {single !== null && (
             <>
-              <line x1={x(hoverIndex)} x2={x(hoverIndex)} y1={PAD.top} y2={PLOT_H - PAD.bottom} stroke="var(--dsw-alias-border-l2)" />
-              <circle cx={x(hoverIndex)} cy={y(hovered[1])} r="3" fill="var(--dsw-alias-bg-layer-1)" stroke={bandColor(iqBand(hovered[1]))} strokeWidth="2" />
+              {/* The lone reading extends flat to the current moment (CONTEXT.md
+                  趋势): fill and stroke share the reading's band color, exactly
+                  how an all-equal multi-point series paints. */}
+              <path
+                d={`M ${single.pointX.toFixed(1)} ${endpointY.toFixed(1)} L ${single.endX.toFixed(1)} ${endpointY.toFixed(1)} L ${single.endX.toFixed(1)} ${baseline} L ${single.pointX.toFixed(1)} ${baseline} Z`}
+                fill={endpointColor}
+                fillOpacity="0.09"
+              />
+              <path
+                d={`M ${single.pointX.toFixed(1)} ${endpointY.toFixed(1)} L ${single.endX.toFixed(1)} ${endpointY.toFixed(1)}`}
+                fill="none"
+                stroke={endpointColor}
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
             </>
           )}
-          <circle cx={x(last)} cy={y(points[last][1])} r="3.8" fill={endpointColor} />
-          <text x={x(last)} y={y(points[last][1]) - 9} textAnchor="end" style={{ ...AXIS_STYLE, fontWeight: 600, fill: 'var(--dsw-alias-label-primary)' }}>{points[last][1].toFixed(1)}</text>
-          <text x={PAD.left} y={PLOT_H - 8} style={AXIS_STYLE}>{formatStamp(points[0][0], false)}</text>
-          <text x={PLOT_W - PAD.right} y={PLOT_H - 8} textAnchor="end" style={AXIS_STYLE}>{formatStamp(points[last][0], false)}</text>
+          {hovered !== undefined && hover !== null && (
+            <>
+              <line x1={hover.px} x2={hover.px} y1={PAD.top} y2={PLOT_H - PAD.bottom} stroke="var(--dsw-alias-border-l2)" />
+              <circle cx={hover.px} cy={y(hovered[1])} r="3" fill="var(--dsw-alias-bg-layer-1)" stroke={bandColor(iqBand(hovered[1]))} strokeWidth="2" />
+            </>
+          )}
+          {multi !== null && (
+            <>
+              <circle cx={multi.x(multi.last)} cy={endpointY} r="3.8" fill={endpointColor} />
+              <text x={multi.x(multi.last)} y={endpointY - 9} textAnchor="end" style={{ ...AXIS_STYLE, fontWeight: 600, fill: 'var(--dsw-alias-label-primary)' }}>{endpointValue.toFixed(1)}</text>
+            </>
+          )}
+          {single !== null && (
+            <>
+              <circle cx={single.pointX} cy={endpointY} r="3.8" fill={endpointColor} />
+              <text x={single.pointX} y={endpointY - 9} textAnchor={singleLabelAnchor} style={{ ...AXIS_STYLE, fontWeight: 600, fill: 'var(--dsw-alias-label-primary)' }}>{single.value.toFixed(1)}</text>
+            </>
+          )}
+          {multi !== null && (
+            <>
+              <text x={PAD.left} y={PLOT_H - 8} style={AXIS_STYLE}>{formatStamp(points[0][0], false)}</text>
+              <text x={PLOT_W - PAD.right} y={PLOT_H - 8} textAnchor="end" style={AXIS_STYLE}>{formatStamp(points[multi.last][0], false)}</text>
+            </>
+          )}
+          {single !== null && (
+            <>
+              <text x={PAD.left} y={PLOT_H - 8} style={AXIS_STYLE}>{formatStamp(single.loTs, true)}</text>
+              <text x={PLOT_W - PAD.right} y={PLOT_H - 8} textAnchor="end" style={AXIS_STYLE}>{formatStamp(single.hiTs, true)}</text>
+            </>
+          )}
         </svg>
-        {hovered !== undefined && hoverIndex !== null && (
-          <PlotTip x={x(hoverIndex)} y={y(hovered[1])} width={PLOT_W} height={PLOT_H}>
+        {hovered !== undefined && hover !== null && (
+          <PlotTip x={hover.px} y={y(hovered[1])} width={PLOT_W} height={PLOT_H}>
             {formatStamp(hovered[0], true)} · {hovered[1].toFixed(1)} {t(BAND_LABEL[iqBand(hovered[1])])}
           </PlotTip>
         )}

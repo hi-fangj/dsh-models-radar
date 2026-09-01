@@ -827,13 +827,15 @@ a.dsh_mr_barLabel:hover { color: var(--dsw-alias-brand-primary); text-decoration
   border-radius: 12px;
   min-width: 0;
   list-style: none;
-  transition: border-color 160ms ease, background-color 160ms ease;
+  transition: background-color 160ms ease;
   overflow: hidden;
 }
-.dsh_mr_prefCard:hover { border-color: var(--dsh-alias-label-dimmed); }
+/* No hover or selected border: neither hovering nor expanding the card may
+   flash the near-black label-dimmed edge (deliberately flatter than the core
+   PluginCard, which borders both). The open state separates by background
+   alone. */
 .dsh_mr_prefCard[data-open="true"] {
   background: var(--dsw-alias-bg-layer-2);
-  border-color: var(--dsw-alias-label-dimmed);
 }
 .dsh_mr_prefHeader {
   width: 100%;

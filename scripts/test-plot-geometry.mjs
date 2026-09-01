@@ -4,11 +4,12 @@
  * The pure math behind the two SVG plots: capability-band segmentation
  * (buildSegments — merge, boundary interpolation, upper-band ownership,
  * descending crossings, multi-boundary spans), linear range fitting
- * (fitRange — slack + flat guard), and the log domain (logDomain —
- * degenerate ×3 guard). Plain asserts — no React, no DOM.
+ * (fitRange — slack + flat guard), the log domain (logDomain —
+ * degenerate ×3 guard), and the single-point trend span (singlePointSpan —
+ * clock-skew clamp). Plain asserts — no React, no DOM.
  */
 import assert from 'node:assert/strict'
-import { BAND_BOUNDARIES, buildSegments, fitRange, logDomain } from '../src/client/plotGeometry.ts'
+import { BAND_BOUNDARIES, buildSegments, fitRange, logDomain, singlePointSpan } from '../src/client/plotGeometry.ts'
 import { bandColor } from '../src/client/scoreMetrics.ts'
 
 // Uniform mappings keep the expected paths easy to reason about: x(i)=10i, y(v)=100−v.
@@ -107,6 +108,17 @@ approx(range.hi, 150)
 range = logDomain([42])
 approx(range.lo, 14)
 approx(range.hi, 126)
+
+// singlePointSpan: a lone reading's window runs test time → now, so the
+// reading sits at the LEFT edge (CONTEXT.md 趋势: the flat line starts at
+// the test time) — the fraction is 0 whenever the reading anchors the
+// domain. Clock skew clamps to the right edge (fraction 1) instead of
+// inverting the domain; equal stamps degenerate to a zero-width window
+// without dividing by zero.
+const HOUR = 3_600_000
+assert.deepEqual(singlePointSpan(HOUR, 3 * HOUR), { lo: HOUR, hi: 3 * HOUR, pointFraction: 0 })
+assert.deepEqual(singlePointSpan(3 * HOUR, HOUR), { lo: HOUR, hi: 3 * HOUR, pointFraction: 1 })
+assert.deepEqual(singlePointSpan(HOUR, HOUR), { lo: HOUR, hi: HOUR, pointFraction: 1 })
 
 function approx(actual, expected) {
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} should be ≈ ${expected}`)

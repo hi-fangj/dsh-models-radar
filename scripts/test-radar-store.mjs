@@ -482,6 +482,116 @@ test('任务目录尽力而为：失败只丢徽章/链接，不阻塞频道', a
 })
 
 // ---------------------------------------------------------------------------
+// 权威实时样本：趋势序列的站点拼接语义（deng.codexradar.com
+// withAuthoritativeTrendPoint）——效率档位等权聚合盖章 source_updated_at。
+// ---------------------------------------------------------------------------
+
+/** Upstream whose eff/hist payloads are supplied verbatim by the test. */
+const liveUpstream = ({ eff, hist }) => ({
+  async fetchDataset(kind) {
+    switch (kind) {
+      case 'benchmarks':
+        return { benchmarks: [{ id: 'deep-swe', title: 'DeepSWE' }] }
+      case 'eff':
+        return eff
+      case 'hist':
+        return hist
+      case 'lb':
+        return { models: [] }
+      case 'catalog':
+        return []
+      default:
+        return {}
+    }
+  },
+  async fetchRatings() {
+    return {}
+  },
+})
+
+test('权威实时样本：停更历史的档位仍带当日实测（24h 窗口单点）', async () => {
+  const upstream = liveUpstream({
+    eff: {
+      mode: 'equal_latest_3',
+      benchmark_id: 'deep-swe',
+      source_updated_at: '2026-09-01T07:58:45+00:00',
+      points: [{ model: 'dsh-deepseek-v4-pro', effort: 'max', iq: 96.04, passed: 178, total: 278, runs_24h: 0 }],
+    },
+    hist: { 'dsh-deepseek-v4-pro@max': [{ ts: '2026-08-26T00:10:15+00:00', score: 91.7 }] },
+  })
+  const store = createRadarDataStore(upstream, fakeSnapshots(), fakeClock())
+  const response = await store.get({ benchmark: 'deep-swe', bypass: true })
+  assert.ok(response.ok)
+  // The live sample scores the equal-weight pass rate × 150 at one decimal
+  // (178/278 → 96.0) and stamps the feed's source_updated_at — the site's
+  // exact arithmetic — so the 24h slice of this quiet tier holds one point.
+  assert.deepEqual(response.data.series['dsh-deepseek-v4-pro@max'], [
+    ['2026-08-26T00:10:15+00:00', 91.7],
+    ['2026-09-01T07:58:45+00:00', 96],
+  ])
+})
+
+test('权威实时样本：同小时替换尾点，滞后样本不回退', async () => {
+  const upstream = liveUpstream({
+    eff: {
+      mode: 'equal_latest_3',
+      benchmark_id: 'deep-swe',
+      source_updated_at: '2026-09-01T07:58:45+00:00',
+      points: [
+        { model: 'm-same', effort: 'high', iq: 96.04, passed: 178, total: 278 },
+        { model: 'm-newer', effort: 'high', iq: 96.04, passed: 178, total: 278 },
+      ],
+    },
+    hist: {
+      'm-same@high': [{ ts: '2026-09-01T07:00:43+00:00', score: 85.6 }],
+      'm-newer@high': [{ ts: '2026-09-01T08:00:54+00:00', score: 85.6 }],
+    },
+  })
+  const store = createRadarDataStore(upstream, fakeSnapshots(), fakeClock())
+  const response = await store.get({ benchmark: 'deep-swe', bypass: true })
+  assert.ok(response.ok)
+  // Same UTC hour as the trailing point → the live sample replaces it (one
+  // reading per hour); a history point newer than the sample is untouched.
+  assert.deepEqual(response.data.series['m-same@high'], [['2026-09-01T07:58:45+00:00', 96]])
+  assert.deepEqual(response.data.series['m-newer@high'], [['2026-09-01T08:00:54+00:00', 85.6]])
+})
+
+test('权威实时样本：空历史 + 有效实测 → 单点序列', async () => {
+  const upstream = liveUpstream({
+    eff: {
+      mode: 'equal_latest_3',
+      benchmark_id: 'deep-swe',
+      source_updated_at: '2026-09-01T07:58:45+00:00',
+      points: [{ model: 'm1', effort: 'high', iq: 90, passed: 3, total: 4 }],
+    },
+    hist: {},
+  })
+  const store = createRadarDataStore(upstream, fakeSnapshots(), fakeClock())
+  const response = await store.get({ benchmark: 'deep-swe', bypass: true })
+  assert.ok(response.ok)
+  // A measured model never falls back to an absent trend: the lone live
+  // reading is the series (3/4 → 112.5).
+  assert.deepEqual(response.data.series['m1@high'], [['2026-09-01T07:58:45+00:00', 112.5]])
+})
+
+test('权威实时样本守卫：cohort 不符或缺等权总量时不拼接', async () => {
+  const history = { 'm1@high': [{ ts: '2026-08-26T00:10:15+00:00', score: 91.7 }] }
+  const cases = [
+    ['mode 不符', { source_updated_at: '2026-09-01T07:58:45+00:00', benchmark_id: 'deep-swe', mode: 'legacy', points: [{ model: 'm1', effort: 'high', passed: 1, total: 2 }] }],
+    ['benchmark 不符', { source_updated_at: '2026-09-01T07:58:45+00:00', mode: 'equal_latest_3', benchmark_id: 'pompeii-adjacency', points: [{ model: 'm1', effort: 'high', passed: 1, total: 2 }] }],
+    ['时间戳缺失', { mode: 'equal_latest_3', benchmark_id: 'deep-swe', points: [{ model: 'm1', effort: 'high', passed: 1, total: 2 }] }],
+    ['passed 缺失', { source_updated_at: '2026-09-01T07:58:45+00:00', mode: 'equal_latest_3', benchmark_id: 'deep-swe', points: [{ model: 'm1', effort: 'high', total: 2 }] }],
+    ['total=0', { source_updated_at: '2026-09-01T07:58:45+00:00', mode: 'equal_latest_3', benchmark_id: 'deep-swe', points: [{ model: 'm1', effort: 'high', passed: 1, total: 0 }] }],
+  ]
+  for (const [label, eff] of cases) {
+    const store = createRadarDataStore(liveUpstream({ eff, hist: history }), fakeSnapshots(), fakeClock())
+    const response = await store.get({ benchmark: 'deep-swe', bypass: true })
+    assert.ok(response.ok, label)
+    assert.deepEqual(response.data.series['m1@high'], [['2026-08-26T00:10:15+00:00', 91.7]], label)
+  }
+})
+
+// ---------------------------------------------------------------------------
 // Community ratings (社区体感分): global datasets, one per window.
 // ---------------------------------------------------------------------------
 

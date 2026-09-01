@@ -102,3 +102,26 @@ export function logDomain(values: number[]): { lo: number; hi: number } {
   }
   return { lo, hi }
 }
+
+/** Time domain of a one-reading trend window, plus where the reading sits in it. */
+export interface SinglePointSpan {
+  /** Domain edges in epoch ms, lo ≤ hi. */
+  lo: number
+  hi: number
+  /** The reading's fraction across [lo, hi]: 0 = test-time edge, 1 = now edge. */
+  pointFraction: number
+}
+
+/**
+ * Single-point trend span (CONTEXT.md 趋势: a lone reading in a window draws
+ * a flat line from its test time to the current moment): the domain runs
+ * reading → now. A future-dated reading (clock skew) clamps to the right
+ * edge instead of inverting the domain; equal stamps degenerate to a
+ * zero-width domain that still places the point without dividing by zero.
+ */
+export function singlePointSpan(testTs: number, nowTs: number): SinglePointSpan {
+  const lo = Math.min(testTs, nowTs)
+  const hi = Math.max(testTs, nowTs)
+  const width = hi - lo
+  return { lo, hi, pointFraction: width > 0 ? (testTs - lo) / width : 1 }
+}
