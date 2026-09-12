@@ -105,9 +105,27 @@ export function LiveCapability({ useSession, modelDirectories, loadData, t }: Li
   }, [loadData, sessionId, liveVisible])
 
   const selection = directoryState.current
+  // The catalog's display name for the selected route, when it differs from the
+  // id. DSH's own adapters spell a route differently from the radar's catalog
+  // (a session reports `deepseek-flash` where the site lists
+  // `deepseek-v4.1-flash`), and the id alone would miss every tier for a model
+  // the site does cover. Undefined whenever the catalog spells it the same way,
+  // which leaves the ordinary id match untouched.
+  const selectionAlias = useMemo(() => {
+    if (selection === null) return undefined
+    for (const group of directoryState.groups) {
+      if (group.id !== selection.provider) continue
+      const entry = group.models.find((candidate) => candidate.id === selection.model)
+      if (entry !== undefined && entry.name !== '' && entry.name !== entry.id) return entry.name
+    }
+    return undefined
+  }, [directoryState.groups, selection])
   const match = useMemo(
-    () => (view === null || selection === null ? null : matchTier(view, selection)),
-    [selection, view],
+    () =>
+      view === null || selection === null
+        ? null
+        : matchTier(view, selectionAlias === undefined ? selection : { ...selection, aliases: [selectionAlias] }),
+    [selection, selectionAlias, view],
   )
 
   const close = useCallback(() => {
