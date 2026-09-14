@@ -21,8 +21,13 @@
  * falls through to the bare id exactly as before.
  *
  * Model-name comparison normalizes both sides: strip any provider path
- * prefix, trim, case-fold. An empty reasoning effort counts as no effort.
- * Pure data in, pure data out — no React, no DOM, node-testable.
+ * prefix, trim, case-fold, then drop every non-alphanumeric separator. The
+ * separators are not cosmetic: the two catalogs spell one version differently —
+ * this session's own adapter names `deepseek-flash` `DeepSeek-V41-Flash` (no
+ * version dot) where the radar writes `deepseek-v4.1-flash` — and a comparison
+ * that keeps them finds no tier at all, leaving the composer readout with
+ * nothing to show. An empty reasoning effort counts as no effort. Pure data
+ * in, pure data out — no React, no DOM, node-testable.
  */
 import type { RadarTier, RadarView } from '../contract.ts'
 
@@ -51,17 +56,23 @@ export interface TierMatchSelection {
    * The same route under other spellings the caller can vouch for — in practice
    * the model catalog's display name. DSH's own adapters name a route
    * differently from the radar's catalog: a session reports `deepseek-flash`
-   * where the radar lists `deepseek-v4.1-flash`, so the id alone misses every
-   * tier even though the site does cover the model. Consulted only after the id
-   * has failed, so a real id hit always wins and a caller with no better
-   * spelling behaves exactly as before.
+   * where the radar lists `deepseek-v4.1-flash`, and the catalog spells that
+   * name `DeepSeek-V41-Flash`, so the id alone misses every tier even though
+   * the site does cover the model. Consulted only after the id has failed, so a
+   * real id hit always wins and a caller with no better spelling behaves
+   * exactly as before.
    */
   aliases?: readonly string[]
 }
 
-/** Provider-qualified id → bare model token, trimmed and case-folded. */
+/** Drop every non-alphanumeric character, so `.`/`-`/`_` spelling cannot decide a match. */
+function foldSeparators(token: string): string {
+  return token.replace(/[^a-z0-9]+/g, '')
+}
+
+/** Provider-qualified id → bare model token, trimmed, case-folded, separators folded. */
 function normalizeModelToken(model: string): string {
-  return model.split('/').pop()?.trim().toLowerCase() ?? model.toLowerCase()
+  return foldSeparators(model.split('/').pop()?.trim().toLowerCase() ?? model.toLowerCase())
 }
 
 /** First tier whose normalized model equals `token`, optionally pinned to one effort. */
@@ -79,7 +90,9 @@ function isNamesake(tier: RadarTier, token: string): boolean {
 
 /** The three-step rule applied to ONE normalized model token. */
 function resolveToken(tiers: readonly RadarTier[], model: string, effort?: string): TierMatch | null {
-  const own = OWN_HARNESS_PREFIX + model
+  // `model` arrives already folded, so prefixing and folding again yields the
+  // folded own-harness token (`dshdeepseekv41flash`) the tiers normalize to.
+  const own = foldSeparators(OWN_HARNESS_PREFIX + model)
   // ① Exact `model@effort` — an empty effort string counts as no effort.
   if (effort !== undefined && effort !== '') {
     const exact = findTier(tiers, own, effort) ?? findTier(tiers, model, effort)

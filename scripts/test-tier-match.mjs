@@ -149,6 +149,21 @@ assert.deepEqual(
   { tier: aliasTiers[1], approximate: false },
 )
 
+// Separators never decide a match. The catalog name the deployment actually
+// serves is `DeepSeek-V41-Flash` — the version dot is gone — so the alias must
+// resolve against the site's dotted `deepseek-v4.1-flash` spelling anyway.
+assert.deepEqual(
+  matchTier(view(aliasTiers), { model: 'deepseek-flash', reasoningEffort: 'high', aliases: ['DeepSeek-V41-Flash'] }),
+  { tier: aliasTiers[1], approximate: false },
+)
+
+// The same folding applies to the id itself and to underscore/case drift.
+const underscoreSpelling = view([tier('deepseek-v4.1-flash', 'high', 86)])
+assert.deepEqual(
+  matchTier(underscoreSpelling, { model: 'deepseek_v41_flash', reasoningEffort: 'HIGH' }),
+  { tier: underscoreSpelling.tiers[0], approximate: false },
+)
+
 // The id always wins: an alias never overrides a direct id hit, even when the
 // alias spelling would have resolved to a different tier.
 const bothSpellings = [tier('deepseek-flash', 'high', 50), tier('dsh-deepseek-v4.1-flash', 'high', 111)]
