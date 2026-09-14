@@ -25,7 +25,6 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-settings",
@@ -63,7 +62,6 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
-    "@deepseek-ai/dsh-client-runtime": "*",
     "@deepseek-ai/dsh-client-locale": "*",
     "@deepseek-ai/dsh-client-ui-slots": "*",
     "@deepseek-ai/dsh-client-ui-settings": "*",
@@ -75,9 +73,6 @@
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/cordis": {
-      "optional": true
-    },
-    "@deepseek-ai/dsh-client-runtime": {
       "optional": true
     },
     "@deepseek-ai/dsh-client-locale": {
